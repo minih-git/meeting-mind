@@ -8,3 +8,6 @@ numpy<2
 loguru
 openai
 noisereduce
+vllm
+transformers
+accelerate

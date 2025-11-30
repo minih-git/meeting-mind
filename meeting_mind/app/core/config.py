@@ -10,7 +10,6 @@ class Settings:
     # Model IDs / Paths
     ASR_MODEL_PATH = os.path.join(
         MODELS_DIR,
-        # "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
         "iic/SenseVoiceSmall",
     )
     VAD_MODEL_PATH = os.path.join(
@@ -22,6 +21,19 @@ class Settings:
     SPEAKER_MODEL_PATH = os.path.join(
         MODELS_DIR, "iic/speech_campplus_sv_zh-cn_16k-common"
     )
+
+    # "cuda" or "cpu"
+    ASR_DEVICE = "cuda"
+
+    # LLM Settings
+    LLM_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
+    # 预留显存给 ASR/VAD，vLLM 默认占用 90%，这里限制为 30% (根据实际显存调整)
+    VLLM_GPU_MEMORY_UTILIZATION = 0.4
+    VLLM_MAX_MODEL_LEN = 2048
+    # "cuda" (使用 vLLM) 或 "cpu" (使用 Transformers)
+    LLM_DEVICE = "cuda"
+    # 默认是否流式输出
+    LLM_STREAM_RESPONSE = False
 
     # Audio Settings
     SAMPLE_RATE = 16000

@@ -14,6 +14,7 @@ def download_models():
         "vad": "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
         "punc": "iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
         "speaker": "iic/speech_campplus_sv_zh-cn_16k-common",
+        "llm": "Qwen/Qwen2.5-1.5B-Instruct",
     }
 
     print(f"Downloading models to {models_dir}...")

@@ -25,13 +25,15 @@
 
 /* Milky White Theme */
 [data-theme='light'] {
-  --bg-primary: #fdfbf7; /* Milky White */
+  --bg-primary: #fdfbf7;
+  /* Milky White */
   --bg-secondary: #ffffff;
   --bg-tertiary: #f0f0f0;
   --text-primary: #2c3e50;
   --text-secondary: #546e7a;
   --text-tertiary: #90a4ae;
-  --accent-primary: #7986cb; /* Softer Blue */
+  --accent-primary: #7986cb;
+  /* Softer Blue */
   --accent-hover: #5c6bc0;
   --border-color: #e0e0e0;
   --glass-bg: rgba(255, 255, 255, 0.6);
@@ -85,7 +87,7 @@ body {
 .status-badge {
   padding: 4px 12px;
   border-radius: 12px;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: bold;
   background-color: var(--bg-tertiary);
   color: var(--text-secondary);
@@ -111,9 +113,11 @@ body {
   0% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.6;
   }
+
   100% {
     opacity: 1;
   }
@@ -187,6 +191,7 @@ button {
   background-color: var(--accent-primary);
   color: white;
 }
+
 .btn-primary:hover {
   background-color: var(--accent-hover);
 }
@@ -195,6 +200,7 @@ button {
   background-color: #d32f2f;
   color: white;
 }
+
 .btn-danger:hover {
   background-color: #b71c1c;
 }
