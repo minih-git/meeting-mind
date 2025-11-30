@@ -223,8 +223,6 @@ class LLMEngine:
         """
         logger.info("正在关闭 LLM 引擎...")
         if self._mode == "cuda":
-            # vLLM 通常不需要显式关闭，但如果使用了 torch.distributed，可能需要清理
-            # 尝试清理 process group
             try:
                 import torch.distributed as dist
 
