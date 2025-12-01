@@ -23,15 +23,23 @@ class Settings:
     )
 
     # "cuda" or "cpu"
-    ASR_DEVICE = "cuda"
+    ASR_DEVICE = "cpu"
 
     # LLM Settings
+    # "local" or "cloud"
+    LLM_PROVIDER = "cloud"
+
+    # 调用远程模型设置
+    CLOUD_LLM_API_KEY = "sk-fdc4a1cd6e714790b400c5a07f6c293c"
+    CLOUD_LLM_API_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    CLOUD_LLM_MODEL = "qwen3-max"
+
     LLM_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
     # 预留显存给 ASR/VAD，vLLM 默认占用 90%，这里限制为 30% (根据实际显存调整)
     VLLM_GPU_MEMORY_UTILIZATION = 0.4
     VLLM_MAX_MODEL_LEN = 2048
     # "cuda" (使用 vLLM) 或 "cpu" (使用 Transformers)
-    LLM_DEVICE = "cuda"
+    LLM_DEVICE = "cpu"
     # 默认是否流式输出
     LLM_STREAM_RESPONSE = False
 

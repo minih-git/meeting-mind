@@ -157,11 +157,16 @@ class SessionManager:
         生成会议分析：总结、要点、行动项
         """
         meeting = self.get_meeting(meeting_id)
-        if not meeting or not meeting.transcripts:
+        if not meeting:
+            return None
+
+        # 获取转录内容
+        transcripts = self.get_transcript(meeting_id)
+        if not transcripts:
             return None
 
         # 拼接全文
-        full_text = "\n".join([f"{t.speaker}: {t.text}" for t in meeting.transcripts])
+        full_text = "\n".join([f"{t.speaker}: {t.text}" for t in transcripts])
 
         if not full_text.strip():
             return None
@@ -234,13 +239,16 @@ class SessionManager:
         生成简短标题
         """
         meeting = self.get_meeting(meeting_id)
-        if not meeting or not meeting.transcripts:
+        if not meeting:
+            return None
+
+        # 获取转录内容
+        transcripts = self.get_transcript(meeting_id)
+        if not transcripts:
             return None
 
         # 拼接全文 (截取前 2000 字符以节省 context)
-        full_text = "\n".join([f"{t.speaker}: {t.text}" for t in meeting.transcripts])[
-            :2000
-        ]
+        full_text = "\n".join([f"{t.speaker}: {t.text}" for t in transcripts])[:2000]
 
         system_prompt = "你是一个会议助手。请根据以下会议内容，生成一个简短、精准的会议标题（不超过15个字）。只返回标题文本，不要包含引号或其他内容。"
 

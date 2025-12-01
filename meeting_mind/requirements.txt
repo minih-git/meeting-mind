@@ -8,6 +8,6 @@ numpy<2
 loguru
 openai
 noisereduce
-vllm
+# vllm
 transformers
 accelerate

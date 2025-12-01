@@ -12,7 +12,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* background-color: #0f172a; Removed to allow canvas background */
   color: var(--text-primary);
-  overflow: hidden;
+  /* overflow: hidden; Removed to allow scrolling on mobile */
   /* Prevent scrollbars from particle canvas */
 }
 
@@ -38,7 +38,6 @@ body {
   box-shadow: var(--shadow-color);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   animation: fadeIn 0.5s ease-out;
 }
 
@@ -59,6 +58,7 @@ body {
   border-bottom: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
+  margin-bottom:0;
   gap: 10px;
 }
 
@@ -107,7 +107,7 @@ body {
 
 .transcript-area {
   flex: 1;
-  padding: 20px 30px;
+  padding: 20px 20px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -257,7 +257,6 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
 }
 
 .history-header {
@@ -269,8 +268,9 @@ body {
   background: var(--glass-bg);
 }
 
+
 .history-header h2 {
-  width: 30rem;
+  width: 10rem;
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
@@ -356,7 +356,7 @@ body {
 }
 
 .history-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -410,4 +410,68 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: auto;
+}
+
+/* Mobile Optimization */
+@media (max-width: 768px) {
+  .glass-container {
+    width: 95%;
+    height: 92vh;
+    border-radius: 16px;
+  }
+
+  .header {
+    padding: 15px 20px;
+  }
+
+  .header h1 {
+    font-size: 1.2rem;
+  }
+
+  .transcript-area {
+    padding: 15px 20px;
+    min-height: 350px;
+  }
+
+  .controls {
+    padding: 15px 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .btn {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    flex: 1;
+    /*强制一行显示*/
+    white-space: nowrap;
+  }
+
+  /* History Page Mobile */
+  .history-header {
+    padding: 15px 20px;
+  }
+
+
+  .history-list {
+    padding: 15px 20px;
+  }
+
+  .history-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ai-analysis-section {
+    margin: 15px !important;
+    padding: 15px !important;
+  }
+
+  .transcript-area {
+    margin: 15px !important;
+  }
 }

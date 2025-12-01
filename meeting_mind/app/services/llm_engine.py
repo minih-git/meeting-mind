@@ -28,6 +28,16 @@ class LLMEngine:
             return
 
         self._mode = settings.LLM_DEVICE.lower()
+        self._provider = getattr(settings, "LLM_PROVIDER", "local")
+
+        if self._provider == "cloud":
+            logger.info(f"使用云端 LLM Provider: {settings.CLOUD_LLM_MODEL}")
+            import openai
+
+            openai.api_key = settings.CLOUD_LLM_API_KEY
+            openai.base_url = settings.CLOUD_LLM_API_BASE
+            return
+
         logger.info(
             f"正在准备加载 LLM 模型: {settings.LLM_MODEL_ID}, 模式: {self._mode}"
         )
@@ -87,8 +97,11 @@ class LLMEngine:
         stream: bool = False,
     ) -> AsyncGenerator[str, None] | Dict[str, Any]:
 
+        if self._provider == "cloud":
+            return await self._chat_cloud(messages, temperature, max_tokens, stream)
+
         if self._engine is None:
-            raise RuntimeError("LLM 引擎未初始化")
+            return await self._chat_cloud(messages, temperature, max_tokens, stream)
 
         if self._mode == "cuda":
             return await self._chat_vllm(messages, temperature, max_tokens, stream)
@@ -99,6 +112,48 @@ class LLMEngine:
                 return await asyncio.to_thread(
                     self._chat_cpu_sync, messages, temperature, max_tokens
                 )
+
+    async def _chat_cloud(self, messages, temperature, max_tokens, stream):
+        import openai
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            api_key=settings.CLOUD_LLM_API_KEY,
+            base_url=settings.CLOUD_LLM_API_BASE,
+        )
+
+        try:
+            response = await client.chat.completions.create(
+                model=settings.CLOUD_LLM_MODEL,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=stream,
+            )
+
+            if stream:
+
+                async def stream_gen():
+                    async for chunk in response:
+                        content = chunk.choices[0].delta.content
+                        if content:
+                            yield content
+
+                return stream_gen()
+            else:
+                content = response.choices[0].message.content
+                usage = response.usage
+                return {
+                    "content": content,
+                    "usage": {
+                        "prompt_tokens": usage.prompt_tokens,
+                        "completion_tokens": usage.completion_tokens,
+                        "total_tokens": usage.total_tokens,
+                    },
+                }
+        except Exception as e:
+            logger.error(f"Cloud LLM request failed: {e}")
+            raise e
 
     async def _chat_vllm(self, messages, temperature, max_tokens, stream):
         from vllm.sampling_params import SamplingParams
