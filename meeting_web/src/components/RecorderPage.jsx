@@ -79,8 +79,11 @@ function RecorderPage({ theme, toggleTheme }) {
       console.log("Meeting created:", meeting.id);
 
       // 2. Initialize WebSocket
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws/api/v1/ws`;
+
       wsClient.current = new WebSocketClient(
-        `ws://${window.location.hostname}:8000/api/v1/ws`,
+        wsUrl,
         (data) => {
           // Handle messages
           if (data.type === "partial") {
@@ -175,8 +178,11 @@ function RecorderPage({ theme, toggleTheme }) {
       setMeetingId(meeting.id);
 
       // 4. Connect WebSocket
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws/api/v1/ws`;
+
       wsClient.current = new WebSocketClient(
-        `ws://${window.location.hostname}:8000/api/v1/ws`,
+        wsUrl,
         (data) => {
           if (data.type === "partial") {
             setPartialText(data.text);
