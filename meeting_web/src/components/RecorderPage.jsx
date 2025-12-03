@@ -345,7 +345,7 @@ function RecorderPage({ theme, toggleTheme }) {
                   onChange={(e) => setUseCloudAsr(e.target.checked)}
                   disabled={status !== "idle"}
                 />
-                云端识别
+                云端模型
               </label>
             </div>
           </div>

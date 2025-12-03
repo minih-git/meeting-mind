@@ -71,6 +71,7 @@ class SessionManager:
             "participants": participants,
             "audio_file": None,
             "ai_analysis": None,  # 存储 AI 分析结果
+            "use_cloud_model": False,
         }
 
         self.meetings[meeting_id] = meeting_info
@@ -94,6 +95,11 @@ class SessionManager:
     def set_audio_file(self, meeting_id: str, filename: str):
         if meeting_id in self.meetings:
             self.meetings[meeting_id]["audio_file"] = filename
+            self.save_session(meeting_id)
+
+    def update_meeting_settings(self, meeting_id: str, use_cloud_model: bool):
+        if meeting_id in self.meetings:
+            self.meetings[meeting_id]["use_cloud_model"] = use_cloud_model
             self.save_session(meeting_id)
 
     def add_transcript(self, meeting_id: str, text: str, speaker: Optional[str] = None):
@@ -192,6 +198,7 @@ class SessionManager:
                     {"role": "user", "content": full_text},
                 ],
                 stream=False,
+                force_cloud=meeting.use_cloud_model,
             )
 
             content = response["content"]
@@ -259,6 +266,7 @@ class SessionManager:
                     {"role": "user", "content": full_text},
                 ],
                 stream=False,
+                force_cloud=meeting.use_cloud_model,
             )
 
             title = response["content"].strip().strip('"').strip("《").strip("》")

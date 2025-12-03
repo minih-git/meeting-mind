@@ -95,9 +95,10 @@ class LLMEngine:
         temperature: float = 0.7,
         max_tokens: int = 512,
         stream: bool = False,
+        force_cloud: bool = False,
     ) -> AsyncGenerator[str, None] | Dict[str, Any]:
 
-        if self._provider == "cloud":
+        if self._provider == "cloud" or force_cloud:
             return await self._chat_cloud(messages, temperature, max_tokens, stream)
 
         if self._engine is None:

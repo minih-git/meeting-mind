@@ -160,6 +160,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # Record file to session
             session_manager.set_audio_file(session_id, wav_filename)
+            session_manager.update_meeting_settings(session_id, handshake.use_cloud_asr)
 
             # Register callback or setup Cloud ASR
             if handshake.use_cloud_asr:

@@ -29,6 +29,7 @@ class MeetingResponse(BaseModel):
     audio_file: Optional[str] = None
     transcripts: Optional[List[TranscriptItem]] = []
     ai_analysis: Optional[AIAnalysis] = None
+    use_cloud_model: bool = False
 
 
 class TranscriptResponse(BaseModel):
