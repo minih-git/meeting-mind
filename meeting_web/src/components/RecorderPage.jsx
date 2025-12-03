@@ -13,6 +13,7 @@ function RecorderPage({ theme, toggleTheme }) {
   const [partialText, setPartialText] = useState("");
   const [analyser, setAnalyser] = useState(null);
   const [duration, setDuration] = useState(0);
+  const [useCloudAsr, setUseCloudAsr] = useState(false);
 
   const audioProcessor = useRef(null);
   const wsClient = useRef(null);
@@ -129,7 +130,7 @@ function RecorderPage({ theme, toggleTheme }) {
         }
       );
 
-      wsClient.current.connect(meeting.id);
+      wsClient.current.connect(meeting.id, { useCloudAsr });
     } catch (err) {
       console.error("Start failed:", err);
       setStatus("error");
@@ -250,7 +251,7 @@ function RecorderPage({ theme, toggleTheme }) {
         }
       );
 
-      wsClient.current.connect(meeting.id);
+      wsClient.current.connect(meeting.id, { useCloudAsr });
     } catch (err) {
       console.error("File upload failed:", err);
       setStatus("error");
@@ -329,6 +330,23 @@ function RecorderPage({ theme, toggleTheme }) {
               >
                 {theme === "light" ? "🌙" : "☀️"}
               </button>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={useCloudAsr}
+                  onChange={(e) => setUseCloudAsr(e.target.checked)}
+                  disabled={status !== "idle"}
+                />
+                云端识别
+              </label>
             </div>
           </div>
           <div

@@ -12,6 +12,7 @@ import wave
 import os
 import datetime
 from meeting_mind.app.services.session_mgr import session_manager
+from meeting_mind.app.services.cloud_asr import CloudASRHandler
 from meeting_mind.app.core.logger import logger
 
 router = APIRouter()
@@ -55,6 +56,8 @@ MAX_WAIT_TIME = 0.5
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     session_id = None
+    cloud_handler = None
+    use_cloud = False
 
     # Event to signal when all processing is done
     processing_finished = asyncio.Event()
@@ -101,7 +104,8 @@ async def websocket_endpoint(websocket: WebSocket):
             # If this was the final chunk, signal completion and cleanup
             if is_final:
                 logger.info(f"Final processing completed for {session_id}")
-                asr_engine.unregister_callback(session_id)
+                if not use_cloud:
+                    asr_engine.unregister_callback(session_id)
                 processing_finished.set()
 
         except Exception as e:
@@ -109,6 +113,13 @@ async def websocket_endpoint(websocket: WebSocket):
             # Ensure we don't hang if error occurs during final processing
             if is_final:
                 processing_finished.set()
+
+    # Callback for Cloud ASR
+    async def cloud_callback(result):
+        # Adapt cloud result to our format
+        # result is {"text": "...", "is_partial": bool}
+        # We need to wrap it in a list as send_results expects
+        await send_results([result], is_final=False)
 
     try:
         # 1. Handshake
@@ -150,16 +161,30 @@ async def websocket_endpoint(websocket: WebSocket):
             # Record file to session
             session_manager.set_audio_file(session_id, wav_filename)
 
-            # Register callback
-            asr_engine.register_callback(session_id, send_results)
+            # Register callback or setup Cloud ASR
+            if handshake.use_cloud_asr:
+                use_cloud = True
+                cloud_handler = CloudASRHandler(cloud_callback)
+                connected = await cloud_handler.connect()
+                if not connected:
+                    logger.error(
+                        "Failed to connect to Cloud ASR, falling back to local?"
+                    )
+                    # For now, just error out or close
+                    await websocket.close(
+                        code=1011, reason="Cloud ASR connection failed"
+                    )
+                    return
+                logger.info(f"Session {session_id} using Cloud ASR")
+            else:
+                asr_engine.register_callback(session_id, send_results)
+                # Ensure worker is running
+                asr_engine.start_worker()
 
         except Exception as e:
             logger.error(f"Handshake failed: {e}")
             await websocket.close(code=1003)
             return
-
-        # Ensure worker is running
-        asr_engine.start_worker()
 
         # 2. Audio Stream Loop
         while True:
@@ -184,9 +209,12 @@ async def websocket_endpoint(websocket: WebSocket):
                         wav_file.writeframes(audio_chunk)
 
                     # Enqueue for processing
-                    await asr_engine.enqueue_audio(
-                        session_id, audio_chunk, is_final=False
-                    )
+                    if use_cloud and cloud_handler:
+                        await cloud_handler.send_audio(audio_chunk)
+                    else:
+                        await asr_engine.enqueue_audio(
+                            session_id, audio_chunk, is_final=False
+                        )
 
                 elif message and "text" in message and message["text"]:
                     # Handle control messages
@@ -196,9 +224,18 @@ async def websocket_endpoint(websocket: WebSocket):
                             logger.info(f"Session {session_id} stopped by client.")
 
                             # Trigger final processing
-                            await asr_engine.enqueue_audio(
-                                session_id, b"", is_final=True
-                            )
+                            if use_cloud and cloud_handler:
+                                await cloud_handler.stop()
+                                # Cloud handler stop might be async and we might need to wait for final results?
+                                # For simplicity, we assume cloud_handler.stop() triggers necessary cleanup/final msg
+                                # But we still need to signal processing_finished for the wait below.
+                                # Actually, cloud_handler loop will close and we might not get a "final" callback in the same way.
+                                # Let's just set it here for cloud case.
+                                processing_finished.set()
+                            else:
+                                await asr_engine.enqueue_audio(
+                                    session_id, b"", is_final=True
+                                )
 
                             # Wait for processing to complete
                             logger.info(
@@ -225,7 +262,13 @@ async def websocket_endpoint(websocket: WebSocket):
             # Enqueue final empty chunk to ensure any remaining buffer is processed
             # We fire and forget here since we can't await if the loop is broken?
             # Actually we can await since we are in async function.
-            await asr_engine.enqueue_audio(session_id, b"", is_final=True)
+            # Enqueue final empty chunk to ensure any remaining buffer is processed
+            # We fire and forget here since we can't await if the loop is broken?
+            # Actually we can await since we are in async function.
+            if use_cloud and cloud_handler:
+                await cloud_handler.stop()
+            else:
+                await asr_engine.enqueue_audio(session_id, b"", is_final=True)
 
             # Do NOT unregister callback here.
             # Let the worker finish processing and call send_results(..., is_final=True),
@@ -236,7 +279,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         if session_id:
-            await asr_engine.enqueue_audio(session_id, b"", is_final=True)
+            if use_cloud and cloud_handler:
+                pass  # Already handled or connection broken
+            else:
+                await asr_engine.enqueue_audio(session_id, b"", is_final=True)
             # Don't unregister here either, let it finish if possible
 
         if websocket.client_state == WebSocketState.CONNECTED:

@@ -12,7 +12,7 @@ export class WebSocketClient {
         this.ws = null;
     }
 
-    connect(meetingId) {
+    connect(meetingId, options = {}) {
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
@@ -20,7 +20,8 @@ export class WebSocketClient {
             // Send handshake
             const handshake = {
                 meeting_id: meetingId,
-                sample_rate: 16000
+                sample_rate: 16000,
+                use_cloud_asr: options.useCloudAsr || false
             };
             this.ws.send(JSON.stringify(handshake));
             if (this.onOpen) this.onOpen();

@@ -11,3 +11,4 @@ noisereduce
 # vllm
 transformers
 accelerate
+websockets==10.4

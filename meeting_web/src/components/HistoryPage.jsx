@@ -107,7 +107,7 @@ const HistoryPage = () => {
         <ParticleBackground theme={localStorage.getItem("theme") || "light"} />
         <div className="glass-container">
           <div className="history-detail">
-            <div className="history-header">
+            <div className="history-header" style={{ flexShrink: 0 }}>
               <button
                 className="back-btn"
                 onClick={() => navigate("/history")}
@@ -155,6 +155,9 @@ const HistoryPage = () => {
                   marginBottom: "20px",
                   border: "1px solid rgba(255, 255, 255, 0.2)",
                   margin: "0 20px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                  flexShrink: 0,
                 }}
               >
                 <div
@@ -209,7 +212,17 @@ const HistoryPage = () => {
               💬 对话记录
             </h3>
 
-            <div className="transcript-area" style={{ margin: "0 20px" }}>
+            <div
+              className="transcript-area"
+              style={{
+                margin: "0 20px",
+                flex: "none",
+                height: "auto",
+                overflow: "visible",
+                minHeight: "300px",
+                flexShrink: 0,
+              }}
+            >
               {selectedMeeting.transcripts &&
                 selectedMeeting.transcripts.map((item, index) => (
                   <div key={index} className="transcript-item">
@@ -228,7 +241,7 @@ const HistoryPage = () => {
               )}
             </div>
 
-            <div className="controls">
+            <div className="controls" style={{ flexShrink: 0 }}>
               <button
                 className="btn btn-primary"
                 onClick={analyzeMeeting}
