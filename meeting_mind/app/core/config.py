@@ -30,7 +30,7 @@ class Settings:
     LLM_PROVIDER = "local"
 
     # 调用远程模型设置
-    CLOUD_LLM_API_KEY = "YOUR_API_KEY"
+    CLOUD_LLM_API_KEY = os.getenv("CLOUD_LLM_API_KEY", "")
 
     # 默认使用开发环境配置，可被环境变量覆盖
     CLOUD_LLM_API_BASE = os.getenv(

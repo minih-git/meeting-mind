@@ -3,9 +3,12 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies
+# libsndfile1 is required for audio processing (soundfile/torchaudio)
+# ffmpeg might be needed for audio conversion
 RUN apt-get update && apt-get install -y \
     build-essential \
     libsndfile1 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -19,4 +22,6 @@ COPY . .
 EXPOSE 8000
 
 # Run command
-CMD ["uvicorn", "meeting_mind.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Ensuring python path includes the current directory
+ENV PYTHONPATH=/app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
