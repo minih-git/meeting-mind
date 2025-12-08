@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
+    port: 9529,
     allowedHosts: true,   
      cors: true,
 
@@ -14,12 +15,12 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:9528',
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://localhost:9528',
         ws: true,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ws/, '') // 可选：重写路径

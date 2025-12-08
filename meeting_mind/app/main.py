@@ -36,3 +36,9 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/")
 def read_root():
     return {"message": "Welcome to MeetingMind API"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicron.run("meeting_mind.app.main:app", host="0.0.0.0", port=9528, reload=True)

@@ -12,21 +12,37 @@ from meeting_mind.app.core.logger import logger
 class ASREngine:
     _instance = None
 
+    # Constants
+    SAMPLE_RATE = 16000
+    BYTES_PER_SAMPLE = 2  # int16
+    SAMPLES_PER_MS = int(SAMPLE_RATE / 1000)  # 16
+    BYTES_PER_MS = int(SAMPLE_RATE * BYTES_PER_SAMPLE / 1000)  # 32
+    PCM_NORM_FACTOR = 32768.0
+
+    # Thresholds
+    MIN_SPEAKER_AUDIO_LEN_SEC = 0.5
+    MIN_SEGMENT_LEN_SEC = 0.2
+    MAX_SEGMENT_DURATION_MS = 10000
+    SPEAKER_SIMILARITY_THRESHOLD = 0.25
+    NOISE_REDUCTION_PROP = 0.8
+    GENDER_FREQ_THRESHOLD = 165
+
+    # VAD
+    VAD_CHUNK_SIZE = 200
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(ASREngine, cls).__new__(cls)
             cls._instance.asr_model = None
             cls._instance.vad_model = None
             cls._instance.punc_model = None
-            cls._instance.cache = (
-                {}
-            )  # session_id -> {asr_cache, vad_cache, punc_cache} 会话缓存
-            cls._instance.speaker_registry = {}  # speaker_id -> embedding
+            cls._instance.cache = {}
+            cls._instance.speaker_registry = {}
 
             # Queue for async processing
             cls._instance.queue = None
             cls._instance.worker_task = None
-            cls._instance.callbacks = {}  # session_id -> callback function
+            cls._instance.callbacks = {}
 
         return cls._instance
 
@@ -51,10 +67,6 @@ class ASREngine:
         try:
             with self._suppress_stdout():
                 # 加载 ASR 模型
-                # logger.info("  - 加载 ASR 模型...") # 移动到 suppress 之外或接受它被屏蔽(如果输出到stdout)
-                # Loguru 默认输出到 stderr，所以应该不受影响
-                pass
-
                 self.asr_model = AutoModel(
                     model=settings.ASR_MODEL_PATH,
                     disable_update=True,
@@ -69,15 +81,11 @@ class ASREngine:
                 )
 
                 # 加载标点模型
-                try:
-                    self.punc_model = AutoModel(
-                        model=settings.PUNC_MODEL_PATH,
-                        disable_update=True,
-                        device=settings.ASR_DEVICE,
-                    )
-                except Exception as e:
-                    # logger.warning...
-                    self.punc_model = None
+                self.punc_model = AutoModel(
+                    model=settings.PUNC_MODEL_PATH,
+                    disable_update=True,
+                    device=settings.ASR_DEVICE,
+                )
 
                 # 加载说话人模型
                 self.speaker_model = AutoModel(
@@ -86,20 +94,21 @@ class ASREngine:
                     device=settings.ASR_DEVICE,
                 )
 
-            logger.info("  ✓ ASR 模型加载成功")
-            logger.info("  ✓ VAD 模型加载成功")
+            if self.asr_model:
+                logger.info("  ✓ ASR 模型加载成功")
+            if self.vad_model:
+                logger.info("  ✓ VAD 模型加载成功")
             if self.punc_model:
                 logger.info("  ✓ 标点模型加载成功")
-            logger.info("  ✓ 说话人模型加载成功")
-
-            logger.info("🎉 所有模型加载完成!")
+            if self.speaker_model:
+                logger.info("  ✓ 说话人模型加载成功")
+            logger.info("🎉 语音识别所需模型加载完成!")
         except Exception as e:
             logger.error(f"❌ 加载模型出错: {e}")
             raise e
 
     def _cosine_similarity(self, v1, v2):
         """计算两个向量的余弦相似度"""
-        # 确保是一维数组
         v1 = np.squeeze(v1)
         v2 = np.squeeze(v2)
 
@@ -111,7 +120,7 @@ class ASREngine:
 
     def detect_gender(self, audio_chunk: bytes):
         """
-        基于音高检测性别 (Heuristic)
+        基于音高检测性别
         Male: < 165Hz
         Female: > 165Hz
         """
@@ -125,11 +134,13 @@ class ASREngine:
 
             # 使用 librosa.pyin 进行音高跟踪
             # 帧长 ~ 30ms
+            # 使用 librosa.pyin 进行音高跟踪
+            # 帧长 ~ 30ms
             f0, voiced_flag, voiced_probs = librosa.pyin(
                 audio_np,
                 fmin=librosa.note_to_hz("C2"),
                 fmax=librosa.note_to_hz("C7"),
-                sr=16000,
+                sr=self.SAMPLE_RATE,
             )
 
             # 过滤 NaN
@@ -141,7 +152,7 @@ class ASREngine:
             avg_pitch = np.mean(f0)
             logger.debug(f"检测到的音高: {avg_pitch:.2f} Hz")
 
-            if avg_pitch < 165:
+            if avg_pitch < self.GENDER_FREQ_THRESHOLD:
                 return "男"
             else:
                 return "女"
@@ -157,7 +168,10 @@ class ASREngine:
             logger.warning("说话人模型未加载")
             return "未知"
 
-        if len(audio_segment) < 16000 * 0.5 * 2:  # 最小 0.5秒 (16k * 2 字节)
+        if (
+            len(audio_segment)
+            < self.SAMPLE_RATE * self.MIN_SPEAKER_AUDIO_LEN_SEC * self.BYTES_PER_SAMPLE
+        ):
             logger.debug(f"音频片段太短，无法进行说话人识别: {len(audio_segment)} 字节")
             return "未知"
 
@@ -165,7 +179,7 @@ class ASREngine:
             # 将字节转换为 numpy 数组
             audio_np = (
                 np.frombuffer(audio_segment, dtype=np.int16).astype(np.float32)
-                / 32768.0
+                / self.PCM_NORM_FACTOR
             )
 
             res = self.speaker_model.generate(input=audio_np, disable_pbar=True)
@@ -177,13 +191,12 @@ class ASREngine:
                     if hasattr(embedding, "cpu"):
                         embedding = embedding.detach().cpu().numpy()
                     elif hasattr(embedding, "numpy"):
-                        # 可能是 CPU tensor 但没有 .cpu() ? 通常都有
                         embedding = embedding.numpy()
 
                     # 简单的说话人聚类/识别逻辑
                     # 阈值通常在 0.25 - 0.4 之间，取决于模型
                     # 降低阈值以提高召回率
-                    THRESHOLD = 0.25
+                    THRESHOLD = self.SPEAKER_SIMILARITY_THRESHOLD
 
                     best_score = -1.0
                     best_speaker = None
@@ -201,9 +214,7 @@ class ASREngine:
                     )
 
                     if best_score > THRESHOLD:
-                        # 在线更新：更新声纹中心
-                        # new_center = alpha * old_center + (1-alpha) * new_emb
-                        # alpha 可以是固定的，也可以基于计数
+                        # 更新声纹中心
                         old_emb = self.speaker_registry[best_speaker]["embedding"]
                         count = self.speaker_registry[best_speaker]["count"]
 
@@ -279,6 +290,78 @@ class ASREngine:
             logger.error(f"音频质量检测错误: {e}")
             # 出错时假设音频有效,避免丢失数据
             return {"is_valid": True, "energy": 0.0, "max_amplitude": 0}
+
+    def _process_audio_segment(self, audio_bytes: bytes, session_id: str = "unknown"):
+        """
+        处理单个音频片段：降噪 -> 说话人识别 -> ASR -> 标点
+        """
+        results = []
+
+        # 1. 检查长度
+        if (
+            len(audio_bytes)
+            < self.SAMPLE_RATE * self.MIN_SEGMENT_LEN_SEC * self.BYTES_PER_SAMPLE
+        ):
+            return results
+
+        # 2. 说话人识别
+        speaker_id = self.recognize_speaker(audio_bytes)
+
+        # 3. 准备音频数据 (float32)
+        audio_np = (
+            np.frombuffer(audio_bytes, dtype=np.int16).astype(np.float32)
+            / self.PCM_NORM_FACTOR
+        )
+
+        # 4. 降噪
+        try:
+            audio_np = nr.reduce_noise(
+                y=audio_np, sr=self.SAMPLE_RATE, prop_decrease=self.NOISE_REDUCTION_PROP
+            )
+        except Exception as e:
+            logger.error(f"Noise reduction failed: {e}")
+
+        # 5. ASR 识别
+        asr_text = ""
+        try:
+            asr_res = self.asr_model.generate(
+                input=audio_np,
+                cache={},  # 句子级别不使用缓存
+                is_final=True,
+                batch_size=1,
+                disable_pbar=True,
+            )
+            logger.debug(f"ASR Raw Result: {asr_res}")
+            if isinstance(asr_res, list) and len(asr_res) > 0:
+                asr_text = asr_res[0].get("text", "")
+                import re
+
+                asr_text = re.sub(r"<\|.*?\|>", "", asr_text).strip()
+        except Exception as e:
+            logger.error(f"ASR 错误: {e}")
+
+        # 6. 标点
+        if asr_text and self.punc_model:
+            try:
+                punc_res = self.punc_model.generate(
+                    input=asr_text, is_final=True, disable_pbar=True
+                )
+                if isinstance(punc_res, list) and len(punc_res) > 0:
+                    asr_text = punc_res[0].get("text", asr_text)
+            except Exception:
+                pass
+
+        if asr_text:
+            logger.info(f"[{session_id[:8]}] 识别结果: {speaker_id} - {asr_text}")
+            results.append(
+                {
+                    "text": asr_text,
+                    "speaker_id": speaker_id,
+                    # timestamp 需要在外部添加
+                }
+            )
+
+        return results
 
     def start_worker(self):
         """Start the background worker for processing audio queue."""
@@ -392,10 +475,10 @@ class ASREngine:
         session_cache["audio_buffer"].extend(audio_chunk)
 
         # 转换当前 chunk 为 float32 用于 VAD
-        # 注意：VAD 需要流式输入，这里我们只传入新到达的 chunk
         if len(audio_chunk) > 0:
             audio_np = (
-                np.frombuffer(audio_chunk, dtype=np.int16).astype(np.float32) / 32768.0
+                np.frombuffer(audio_chunk, dtype=np.int16).astype(np.float32)
+                / self.PCM_NORM_FACTOR
             )
         else:
             audio_np = np.array([], dtype=np.float32)
@@ -409,11 +492,10 @@ class ASREngine:
                     cache=session_cache["vad"],
                     is_final=is_final,
                     batch_size=1,
-                    chunk_size=200,  # VAD 块大小
+                    chunk_size=self.VAD_CHUNK_SIZE,  # VAD 块大小
                     disable_pbar=True,
                 )
-                # VAD 返回的是相对于本次输入流的绝对时间戳（如果 cache 正确维护）
-                # FunASR VAD 输出格式通常是 [[start, end], ...] 毫秒
+                # VAD 返回的是相对于本次输入流的绝对时间戳
                 if isinstance(vad_res, list) and len(vad_res) > 0:
                     vad_segments = vad_res[0].get("value", [])
             except Exception as e:
@@ -421,8 +503,6 @@ class ASREngine:
 
             if len(vad_segments) > 0:
                 logger.debug(f"[{session_id[:8]}] VAD Segments: {vad_segments}")
-            # else:
-            #    logger.debug(f"[{session_id[:8]}] No VAD segments")
 
         results = []
 
@@ -445,8 +525,8 @@ class ASREngine:
                     # 计算 byte 偏移 (16kHz, 16bit = 32 bytes/ms)
                     # 使用绝对字节偏移计算，避免累积误差
 
-                    abs_start_byte = int(start_ms_stored * 32)
-                    abs_end_byte = int(end_ms * 32)
+                    abs_start_byte = int(start_ms_stored * self.BYTES_PER_MS)
+                    abs_end_byte = int(end_ms * self.BYTES_PER_MS)
 
                     buffer_offset_bytes = session_cache["buffer_offset_bytes"]
 
@@ -476,77 +556,15 @@ class ASREngine:
                         ]
 
                         # 4. 对该片段进行 ASR 和 说话人识别
-                        if (
-                            len(segment_audio) > 16000 * 0.2 * 2
-                        ):  # 忽略极短片段 (<200ms)
+                        # 使用 helper method
+                        seg_results = self._process_audio_segment(
+                            segment_audio, session_id
+                        )
 
-                            # A. 说话人识别
-                            speaker_id = self.recognize_speaker(segment_audio)
-
-                            # B. ASR 识别
-                            seg_audio_np = (
-                                np.frombuffer(segment_audio, dtype=np.int16).astype(
-                                    np.float32
-                                )
-                                / 32768.0
-                            )
-
-                            # Apply Noise Reduction
-                            try:
-                                # Simple stationary noise reduction
-                                # prop_decrease=0.8 means reduce noise by 80% (less aggressive to avoid artifacts)
-                                seg_audio_np = nr.reduce_noise(
-                                    y=seg_audio_np, sr=16000, prop_decrease=0.8
-                                )
-                            except Exception as e:
-                                logger.error(f"Noise reduction failed: {e}")
-
-                            asr_text = ""
-                            try:
-                                # 使用 SenseVoice 或 Paraformer 进行整句识别
-                                # 注意：这里不使用 cache，因为是独立的句子
-                                asr_res = self.asr_model.generate(
-                                    input=seg_audio_np,
-                                    cache={},  # 句子级别不使用缓存
-                                    is_final=True,
-                                    batch_size=1,
-                                    disable_pbar=True,
-                                )
-                                logger.debug(f"ASR Raw Result: {asr_res}")
-                                if isinstance(asr_res, list) and len(asr_res) > 0:
-                                    asr_text = asr_res[0].get("text", "")
-                                    # 清理 SenseVoice 标签
-                                    import re
-
-                                    asr_text = re.sub(
-                                        r"<\|.*?\|>", "", asr_text
-                                    ).strip()
-                            except Exception as e:
-                                logger.error(f"ASR 错误: {e}")
-
-                            # C. 标点 (可选，SenseVoice 通常自带标点)
-                            if asr_text and self.punc_model:
-                                try:
-                                    punc_res = self.punc_model.generate(
-                                        input=asr_text, is_final=True, disable_pbar=True
-                                    )
-                                    if isinstance(punc_res, list) and len(punc_res) > 0:
-                                        asr_text = punc_res[0].get("text", asr_text)
-                                except Exception:
-                                    pass
-
-                            if asr_text:
-                                logger.info(
-                                    f"[{session_id[:8]}] 识别结果: {speaker_id} - {asr_text}"
-                                )
-                                results.append(
-                                    {
-                                        "text": asr_text,
-                                        "speaker_id": speaker_id,
-                                        "timestamp": end_ms / 1000.0,  # 使用结束时间
-                                        "vad_segment": [start_ms, end_ms],
-                                    }
-                                )
+                        for res in seg_results:
+                            res["timestamp"] = end_ms / 1000.0
+                            res["vad_segment"] = [start_ms, end_ms]
+                            results.append(res)
 
                         # 5. 清理 Buffer
                         # 我们可以安全地移除 end_byte 之前的数据
@@ -556,7 +574,6 @@ class ASREngine:
 
                     else:
                         # 数据还不够，等待更多数据
-                        # logger.debug(f"[{session_id[:8]}] 等待更多数据: {len(session_cache['audio_buffer'])} < {end_byte}")
                         pass
 
                     # 重置开始时间
@@ -569,11 +586,16 @@ class ASREngine:
         current_start_ms = session_cache["vad_state"]["current_start_ms"]
         buffer_len_bytes = len(session_cache["audio_buffer"])
 
-        # 兜底逻辑：如果 buffer 太长 (> 2s) 且没有 start_ms，强制设置 start
-        if current_start_ms == -1 and buffer_len_bytes > 16000 * 2 * 2:  # 2 seconds
+        # 兜底逻辑：如果 buffer 太长 (> 5s) 且没有 start_ms，强制设置 start
+        if (
+            current_start_ms == -1
+            and buffer_len_bytes > self.SAMPLE_RATE * self.BYTES_PER_SAMPLE * 5
+        ):  # 5 seconds
             # 我们假设语音从 buffer 开头就开始了
             # 计算 buffer 开头对应的时间戳
-            buffer_start_ms = session_cache["buffer_offset_bytes"] / 32.0
+            buffer_start_ms = session_cache["buffer_offset_bytes"] / float(
+                self.BYTES_PER_MS
+            )
             session_cache["vad_state"]["current_start_ms"] = buffer_start_ms
             current_start_ms = buffer_start_ms
             logger.info(
@@ -590,15 +612,15 @@ class ASREngine:
             # 简化计算：持续时间 = (当前 buffer 长度 + (buffer_offset - start_byte)) / 32
             # start_byte = start_ms * 32
 
-            abs_start_byte = int(current_start_ms * 32)
+            abs_start_byte = int(current_start_ms * self.BYTES_PER_MS)
             current_abs_end_byte = session_cache["buffer_offset_bytes"] + len(
                 session_cache["audio_buffer"]
             )
 
             duration_bytes = current_abs_end_byte - abs_start_byte
-            duration_ms = duration_bytes / 32.0
+            duration_ms = duration_bytes / float(self.BYTES_PER_MS)
 
-            MAX_DURATION_MS = 10000  # 10秒
+            MAX_DURATION_MS = self.MAX_SEGMENT_DURATION_MS
 
             # --- Partial Result Logic ---
             # Check if we should generate a partial result
@@ -617,10 +639,15 @@ class ASREngine:
 
                 partial_audio = session_cache["audio_buffer"][start_byte:]
 
-                if len(partial_audio) > 16000 * 0.2 * 2:
+                if (
+                    len(partial_audio)
+                    > self.SAMPLE_RATE
+                    * self.MIN_SEGMENT_LEN_SEC
+                    * self.BYTES_PER_SAMPLE
+                ):
                     seg_audio_np = (
                         np.frombuffer(partial_audio, dtype=np.int16).astype(np.float32)
-                        / 32768.0
+                        / self.PCM_NORM_FACTOR
                     )
                     try:
                         # Use is_final=False for partials if supported, or True but mark result as partial
@@ -660,15 +687,9 @@ class ASREngine:
                     f"[{session_id[:8]}] 检测到长语音 ({duration_ms:.0f}ms)，强制断句"
                 )
 
-                # 强制构造一个 segment
-                # end_ms = current_start_ms + MAX_DURATION_MS
-                # 但是我们应该利用当前已有的所有音频，或者截断到 10s
-                # 为了用户体验，我们处理当前 buffer 中的所有数据（或者直到 10s 处）
-
                 # 让我们截断到当前 buffer 结尾，作为一段
                 force_end_ms = current_start_ms + duration_ms
 
-                # 复用处理逻辑 (提取为函数会更好，但这里先内联)
                 # 计算相对偏移
                 start_byte = abs_start_byte - session_cache["buffer_offset_bytes"]
                 end_byte = len(session_cache["audio_buffer"])  # 全部用完
@@ -679,55 +700,14 @@ class ASREngine:
                 if end_byte > start_byte:
                     segment_audio = session_cache["audio_buffer"][start_byte:end_byte]
 
-                    if len(segment_audio) > 16000 * 0.2 * 2:
-                        speaker_id = self.recognize_speaker(segment_audio)
+                    # 使用 helper method
+                    seg_results = self._process_audio_segment(segment_audio, session_id)
 
-                        seg_audio_np = (
-                            np.frombuffer(segment_audio, dtype=np.int16).astype(
-                                np.float32
-                            )
-                            / 32768.0
-                        )
-
-                        # Apply Noise Reduction (Force segment)
-                        try:
-                            seg_audio_np = nr.reduce_noise(
-                                y=seg_audio_np, sr=16000, prop_decrease=0.8
-                            )
-                        except Exception as e:
-                            logger.error(f"Noise reduction failed (Force): {e}")
-
-                        asr_text = ""
-                        try:
-                            asr_res = self.asr_model.generate(
-                                input=seg_audio_np,
-                                cache={},
-                                is_final=True,
-                                batch_size=1,
-                                disable_pbar=True,
-                            )
-                            logger.debug(f"ASR Raw Result (Force): {asr_res}")
-                            if isinstance(asr_res, list) and len(asr_res) > 0:
-                                asr_text = asr_res[0].get("text", "")
-                                import re
-
-                                asr_text = re.sub(r"<\|.*?\|>", "", asr_text).strip()
-                        except Exception as e:
-                            logger.error(f"ASR 错误 (Force): {e}")
-
-                        if asr_text:
-                            logger.info(
-                                f"[{session_id[:8]}] 识别结果 (Force): {speaker_id} - {asr_text}"
-                            )
-                            results.append(
-                                {
-                                    "text": asr_text,
-                                    "speaker_id": speaker_id,
-                                    "timestamp": force_end_ms / 1000.0,
-                                    "vad_segment": [current_start_ms, force_end_ms],
-                                    "is_partial": False,
-                                }
-                            )
+                    for res in seg_results:
+                        res["timestamp"] = force_end_ms / 1000.0
+                        res["vad_segment"] = [current_start_ms, force_end_ms]
+                        res["is_partial"] = False
+                        results.append(res)
 
                     # 清理 buffer
                     del session_cache["audio_buffer"][:end_byte]
@@ -742,43 +722,13 @@ class ASREngine:
         if is_final and len(session_cache["audio_buffer"]) > 0:
             # 处理剩余的所有音频
             remaining_audio = session_cache["audio_buffer"]
-            if len(remaining_audio) > 16000 * 0.5 * 2:
-                speaker_id = self.recognize_speaker(remaining_audio)
-                speaker_id = self.recognize_speaker(remaining_audio)
-                seg_audio_np = (
-                    np.frombuffer(remaining_audio, dtype=np.int16).astype(np.float32)
-                    / 32768.0
-                )
 
-                # Apply Noise Reduction (Final)
-                try:
-                    seg_audio_np = nr.reduce_noise(
-                        y=seg_audio_np, sr=16000, prop_decrease=0.8
-                    )
-                except Exception as e:
-                    logger.error(f"Noise reduction failed (Final): {e}")
-
-                try:
-                    asr_res = self.asr_model.generate(
-                        input=seg_audio_np, is_final=True, disable_pbar=True
-                    )
-                    if isinstance(asr_res, list) and len(asr_res) > 0:
-                        text = asr_res[0].get("text", "")
-                        import re
-
-                        text = re.sub(r"<\|.*?\|>", "", text).strip()
-                        if text:
-                            results.append(
-                                {
-                                    "text": text,
-                                    "speaker_id": speaker_id,
-                                    "timestamp": time.time(),
-                                    "vad_segment": [],
-                                    "is_partial": False,
-                                }
-                            )
-                except Exception:
-                    pass
+            seg_results = self._process_audio_segment(remaining_audio, session_id)
+            for res in seg_results:
+                res["timestamp"] = time.time()
+                res["vad_segment"] = []
+                res["is_partial"] = False
+                results.append(res)
 
             # 清理
             del self.cache[session_id]
@@ -799,7 +749,7 @@ class ASREngine:
 
         # Load audio (resample to 16000)
         try:
-            audio, _ = librosa.load(file_path, sr=16000, mono=True)
+            audio, _ = librosa.load(file_path, sr=self.SAMPLE_RATE, mono=True)
             # Convert to float32 (librosa loads as float32, normalized -1 to 1)
             # FunASR expects float32 or int16.
             # Our previous logic used int16 bytes -> float32.
@@ -823,7 +773,7 @@ class ASREngine:
             logger.error(f"VAD failed for file {file_path}: {e}")
             # Fallback: treat whole file as one segment if short, or fail?
             # Let's try to proceed with whole file if VAD fails
-            vad_segments = [[0, len(audio) / 16000 * 1000]]
+            vad_segments = [[0, len(audio) / self.SAMPLE_RATE * 1000]]
 
         logger.info(f"File VAD segments: {len(vad_segments)}")
 
@@ -833,29 +783,29 @@ class ASREngine:
             if start_ms == -1 or end_ms == -1:
                 continue
 
-            start_sample = int(start_ms * 16)  # ms * 16 samples/ms
-            end_sample = int(end_ms * 16)
+            start_sample = int(start_ms * self.SAMPLES_PER_MS)  # ms * 16 samples/ms
+
+            end_sample = int(end_ms * self.SAMPLES_PER_MS)
 
             segment_audio = audio[start_sample:end_sample]
 
-            if len(segment_audio) < 16000 * 0.2:  # Skip < 0.2s
+            if (
+                len(segment_audio) < self.SAMPLE_RATE * self.MIN_SEGMENT_LEN_SEC
+            ):  # Skip < 0.2s
                 continue
 
-            # Convert to int16 bytes for speaker recognition (our recognize_speaker expects bytes)
-            # Or modify recognize_speaker to accept numpy array.
-            # Let's modify recognize_speaker to accept numpy array or bytes to be safe,
             # OR just convert back to bytes here.
-            segment_int16 = (segment_audio * 32768).astype(np.int16)
+            segment_int16 = (segment_audio * self.PCM_NORM_FACTOR).astype(np.int16)
             segment_bytes = segment_int16.tobytes()
 
-            # A. Speaker ID
             speaker_id = self.recognize_speaker(segment_bytes)
 
-            # B. ASR
             # Apply Noise Reduction
             try:
                 segment_audio = nr.reduce_noise(
-                    y=segment_audio, sr=16000, prop_decrease=0.8
+                    y=segment_audio,
+                    sr=self.SAMPLE_RATE,
+                    prop_decrease=self.NOISE_REDUCTION_PROP,
                 )
             except Exception as e:
                 logger.error(f"Noise reduction failed: {e}")

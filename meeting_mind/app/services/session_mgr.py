@@ -109,7 +109,40 @@ class SessionManager:
             self.save_session(meeting_id)
 
     def get_transcript(self, meeting_id: str) -> List[TranscriptItem]:
-        return self.transcripts.get(meeting_id, [])
+        # 1. Memory cache hit
+        if meeting_id in self.transcripts:
+            return self.transcripts[meeting_id]
+
+        # 2. Check loaded meetings dict
+        if meeting_id in self.meetings:
+            meeting_data = self.meetings[meeting_id]
+            if "transcripts" in meeting_data:
+                try:
+                    items = [TranscriptItem(**t) for t in meeting_data["transcripts"]]
+                    self.transcripts[meeting_id] = items
+                    return items
+                except Exception as e:
+                    logger.error(
+                        f"Error parsing transcripts from memory for {meeting_id}: {e}"
+                    )
+
+        # 3. Fallback to disk read
+        filepath = os.path.join(self.data_dir, f"{meeting_id}.json")
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if "transcripts" in data:
+                        items = [TranscriptItem(**t) for t in data["transcripts"]]
+                        self.transcripts[meeting_id] = items
+                        # Ensure meeting metadata is loaded if missing
+                        if meeting_id not in self.meetings:
+                            self.meetings[meeting_id] = data
+                        return items
+            except Exception as e:
+                logger.error(f"Failed to load transcript from file {filepath}: {e}")
+
+        return []
 
     def get_history_list(self) -> List[dict]:
         """Get list of meeting summaries sorted by time desc"""
