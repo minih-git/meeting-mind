@@ -1,23 +1,23 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import './App.css'
-import RecorderPage from './components/RecorderPage'
-import HistoryPage from './components/HistoryPage'
+import { useState, useEffect } from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import "./App.css";
+import RecorderPage from "./components/RecorderPage";
+import HistoryPage from "./components/HistoryPage";
 
 function App() {
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light')
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('theme', theme)
-  }, [theme])
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light')
-  }
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route
@@ -27,8 +27,8 @@ function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/history/detail" element={<HistoryPage />} />
       </Routes>
-    </BrowserRouter>
-  )
+    </HashRouter>
+  );
 }
 
-export default App
+export default App;
