@@ -65,7 +65,8 @@ function RecorderPage({ theme, toggleTheme }) {
       clearRecords();
 
       // 1. Create Meeting via REST API
-      const response = await fetch("/api/v1/meetings", {
+      const apiPrefix = import.meta.env.VITE_API_PREFIX || "/api/v1";
+      const response = await fetch(`${apiPrefix}/meetings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -81,7 +82,8 @@ function RecorderPage({ theme, toggleTheme }) {
 
       // 2. Initialize WebSocket
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws/api/v1/ws`;
+      const wsPath = import.meta.env.VITE_WS_URI || "/ws/api/v1/ws";
+      const wsUrl = `${protocol}//${window.location.host}${wsPath}`;
 
       wsClient.current = new WebSocketClient(
         wsUrl,
@@ -165,7 +167,8 @@ function RecorderPage({ theme, toggleTheme }) {
       console.log("Audio processed, size:", pcmBuffer.byteLength);
 
       // 3. Create Meeting
-      const response = await fetch("/api/v1/meetings", {
+      const apiPrefix = import.meta.env.VITE_API_PREFIX || "/api/v1";
+      const response = await fetch(`${apiPrefix}/meetings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -180,7 +183,8 @@ function RecorderPage({ theme, toggleTheme }) {
 
       // 4. Connect WebSocket
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws/api/v1/ws`;
+      const wsPath = import.meta.env.VITE_WS_URI || "/ws/api/v1/ws";
+      const wsUrl = `${protocol}//${window.location.host}${wsPath}`;
 
       wsClient.current = new WebSocketClient(
         wsUrl,
@@ -296,7 +300,10 @@ function RecorderPage({ theme, toggleTheme }) {
     // Call Stop API (optional, if backend needs it, but WS stop should be enough for session)
     if (meetingId) {
       try {
-        await fetch(`/api/v1/meetings/${meetingId}/stop`, { method: "POST" });
+        const apiPrefix = import.meta.env.VITE_API_PREFIX || "/api/v1";
+        await fetch(`${apiPrefix}/meetings/${meetingId}/stop`, {
+          method: "POST",
+        });
       } catch (e) {
         console.error("Stop API failed", e);
       }

@@ -31,8 +31,14 @@ class Settings:
 
     # 调用远程模型设置
     CLOUD_LLM_API_KEY = "YOUR_API_KEY"
-    CLOUD_LLM_API_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    CLOUD_ASR_API_BASE = "wss://dashscope.aliyuncs.com/api-ws/v1/inference/"
+
+    # 默认使用开发环境配置，可被环境变量覆盖
+    CLOUD_LLM_API_BASE = os.getenv(
+        "CLOUD_LLM_API_BASE", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+    CLOUD_ASR_API_BASE = os.getenv(
+        "CLOUD_ASR_API_BASE", "wss://dashscope.aliyuncs.com/api-ws/v1/inference/"
+    )
     CLOUD_LLM_MODEL = "qwen3-max"
     CLOUD_ASR_MODEL = "fun-asr-realtime"
 

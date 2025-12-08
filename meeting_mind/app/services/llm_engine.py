@@ -43,10 +43,19 @@ class LLMEngine:
         )
 
         try:
-            # 确保模型已下载并获取本地路径
-            model_path = snapshot_download(
-                settings.LLM_MODEL_ID, cache_dir=settings.MODELS_DIR
-            )
+            # 优先检查本地模型路径，避免非必要的联网检查
+            local_model_path = os.path.join(settings.MODELS_DIR, settings.LLM_MODEL_ID)
+            if os.path.exists(local_model_path):
+                logger.info(f"发现本地模型，直接加载: {local_model_path}")
+                model_path = local_model_path
+            else:
+                logger.info(
+                    f"本地模型未找到 ({local_model_path})，尝试从 ModelScope 下载/加载..."
+                )
+                # 确保模型已下载并获取本地路径
+                model_path = snapshot_download(
+                    settings.LLM_MODEL_ID, cache_dir=settings.MODELS_DIR
+                )
             logger.info(f"模型路径: {model_path}")
 
             # 初始化 Tokenizer
