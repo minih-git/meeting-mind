@@ -44,23 +44,17 @@ cd meeting-mind
 
 ### 2. 后端设置 (meeting_mind)
 
+该项目使用 `uv` 进行依赖管理。
+
 ```bash
-cd meeting_mind
+# 在项目根目录下 (确保已安装 uv)
+uv sync
 
-# 创建并激活虚拟环境
-python -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 下载模型 (首次运行会自动下载，也可手动执行)
-python download_models.py
+# 下载模型 (通过 uv 运行)
+uv run python meeting_mind/download_models.py
 
 # 启动后端服务
-# 默认使用 GPU (vLLM)，如需使用 CPU 请在 .env 或 config.py 中配置 LLM_DEVICE="cpu"
-uvicorn app.main:app --reload
+uv run uvicorn meeting_mind.app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 3. 前端设置 (meeting_web)
