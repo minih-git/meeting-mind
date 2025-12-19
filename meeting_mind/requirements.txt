@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+funasr
+modelscope
+torch
+torchaudio
+numpy<2
+loguru
+openai
+noisereduce
+# vllm
+transformers
+accelerate
+websockets==10.4

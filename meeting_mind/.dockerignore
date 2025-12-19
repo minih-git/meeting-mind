@@ -1,0 +1,5 @@
+models/
+__pycache__/
+.DS_Store
+.git/
+venv/

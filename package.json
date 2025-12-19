@@ -1,0 +1,20 @@
+{
+  "name": "minih-meeting",
+  "version": "1.0.3",
+  "description": "Meeting Mind 是一个智能会议记录与分析系统，结合了实时语音识别（ASR）、说话人分离（Diarization）和本地大语言模型（LLM）智能分析功能。它能够实时转录会议内容，区分不同的发言者，并利用本地部署的 LLM 自动生成会议标题、总结、关键要点和行动项，确保数据隐私和安全。",
+  "homepage": "https://github.com/minih-git/meeting-mind#readme",
+  "bugs": {
+    "url": "https://github.com/minih-git/meeting-mind/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minih-git/meeting-mind.git"
+  },
+  "license": "ISC",
+  "author": "minih",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

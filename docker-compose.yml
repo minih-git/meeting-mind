@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./meeting_mind
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./meeting_mind:/app
+    networks:
+      - meeting_network
+
+  frontend:
+    build:
+      context: ./meeting_web
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - meeting_network
+
+networks:
+  meeting_network:
+    driver: bridge
