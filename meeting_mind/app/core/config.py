@@ -7,30 +7,24 @@ class Settings:
     )
     MODELS_DIR = os.path.join(BASE_DIR, "models")
 
-    # Model IDs / Paths
-    ASR_MODEL_PATH = os.path.join(
-        MODELS_DIR,
-        "iic/SenseVoiceSmall",
-    )
+    # 本地模型路径配置
+    # 路径格式：MODELS_DIR + ModelScope 模型 ID，首次加载时自动下载
+    ASR_MODEL_PATH = os.path.join(MODELS_DIR, "iic/SenseVoiceSmall")  # 语音识别
     VAD_MODEL_PATH = os.path.join(
         MODELS_DIR, "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
-    )
+    )  # 语音活动检测
     PUNC_MODEL_PATH = os.path.join(
         MODELS_DIR, "iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch"
-    )
+    )  # 标点恢复
     SPEAKER_MODEL_PATH = os.path.join(
         MODELS_DIR, "iic/speech_campplus_sv_zh-cn_16k-common"
-    )
-
-    # "cuda" or "cpu"
-    ASR_DEVICE = "cpu"
+    )  # 说话人识别
+    LLM_MODEL_PATH = os.path.join(
+        MODELS_DIR, "Qwen/Qwen2.5-1.5B-Instruct"
+    )  # 大语言模型
 
     # 是否启用云端 ASR（设为 False 时强制使用本地模型）
     ENABLE_CLOUD_ASR = False
-
-    # LLM Settings
-    # "local" or "cloud"
-    LLM_PROVIDER = "local"
 
     # 调用远程模型设置 (从环境变量读取，避免泄露)
     CLOUD_LLM_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
@@ -45,14 +39,11 @@ class Settings:
     CLOUD_LLM_MODEL = "qwen3-max"
     CLOUD_ASR_MODEL = "fun-asr-realtime"
 
-    LLM_MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
+    # 推理设备: "cuda" 或 "cpu"
+    DEVICE = "cpu"
     # 预留显存给 ASR/VAD，vLLM 默认占用 90%，这里限制为 30% (根据实际显存调整)
     VLLM_GPU_MEMORY_UTILIZATION = 0.4
     VLLM_MAX_MODEL_LEN = 2048
-    # "cuda" (使用 vLLM) 或 "cpu" (使用 Transformers)
-    LLM_DEVICE = "cpu"
-    # 默认是否流式输出
-    LLM_STREAM_RESPONSE = False
 
     # Audio Settings
     SAMPLE_RATE = 16000

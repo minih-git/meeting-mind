@@ -4,7 +4,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from meeting_mind.app.services.llm_engine import llm_engine
 from meeting_mind.app.core.logger import logger
-from meeting_mind.app.core.config import settings
 
 router = APIRouter()
 
@@ -27,12 +26,8 @@ async def chat(request: ChatRequest):
     与本地 LLM 进行对话。
     """
     try:
-        # 确定是否流式输出
-        use_stream = (
-            request.stream
-            if request.stream is not None
-            else settings.LLM_STREAM_RESPONSE
-        )
+        # 确定是否流式输出（默认非流式）
+        use_stream = request.stream if request.stream is not None else False
 
         # 转换 messages 格式
         messages_dict = [msg.model_dump() for msg in request.messages]

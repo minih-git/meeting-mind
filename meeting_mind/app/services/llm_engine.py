@@ -27,35 +27,19 @@ class LLMEngine:
         if self._engine is not None:
             return
 
-        self._mode = settings.LLM_DEVICE.lower()
-        self._provider = getattr(settings, "LLM_PROVIDER", "local")
-
-        if self._provider == "cloud":
-            logger.info(f"使用云端 LLM Provider: {settings.CLOUD_LLM_MODEL}")
-            import openai
-
-            openai.api_key = settings.CLOUD_LLM_API_KEY
-            openai.base_url = settings.CLOUD_LLM_API_BASE
-            return
+        self._mode = settings.DEVICE.lower()
 
         logger.info(
-            f"正在准备加载 LLM 模型: {settings.LLM_MODEL_ID}, 模式: {self._mode}"
+            f"正在准备加载 LLM 模型: {settings.LLM_MODEL_PATH}, 模式: {self._mode}"
         )
 
         try:
-            # 优先检查本地模型路径，避免非必要的联网检查
-            local_model_path = os.path.join(settings.MODELS_DIR, settings.LLM_MODEL_ID)
-            if os.path.exists(local_model_path):
-                logger.info(f"发现本地模型，直接加载: {local_model_path}")
-                model_path = local_model_path
-            else:
-                logger.info(
-                    f"本地模型未找到 ({local_model_path})，尝试从 ModelScope 下载/加载..."
-                )
-                # 确保模型已下载并获取本地路径
-                model_path = snapshot_download(
-                    settings.LLM_MODEL_ID, cache_dir=settings.MODELS_DIR
-                )
+            model_path = settings.LLM_MODEL_PATH
+            if not os.path.exists(model_path):
+                logger.info(f"本地模型未找到 ({model_path})，尝试从 ModelScope 下载...")
+                # 从路径中提取模型 ID 进行下载
+                model_id = os.path.relpath(model_path, settings.MODELS_DIR)
+                model_path = snapshot_download(model_id, cache_dir=settings.MODELS_DIR)
             logger.info(f"模型路径: {model_path}")
 
             # 初始化 Tokenizer
@@ -107,7 +91,7 @@ class LLMEngine:
         force_cloud: bool = False,
     ) -> AsyncGenerator[str, None] | Dict[str, Any]:
 
-        if self._provider == "cloud" or force_cloud:
+        if force_cloud:
             return await self._chat_cloud(messages, temperature, max_tokens, stream)
 
         if self._engine is None:

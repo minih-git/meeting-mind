@@ -74,28 +74,28 @@ class ASREngine:
                 self.asr_model = AutoModel(
                     model=settings.ASR_MODEL_PATH,
                     disable_update=True,
-                    device=settings.ASR_DEVICE,
+                    device=settings.DEVICE,
                 )
 
                 # 加载 VAD 模型
                 self.vad_model = AutoModel(
                     model=settings.VAD_MODEL_PATH,
                     disable_update=True,
-                    device=settings.ASR_DEVICE,
+                    device=settings.DEVICE,
                 )
 
                 # 加载标点模型
                 self.punc_model = AutoModel(
                     model=settings.PUNC_MODEL_PATH,
                     disable_update=True,
-                    device=settings.ASR_DEVICE,
+                    device=settings.DEVICE,
                 )
 
                 # 加载说话人模型
                 self.speaker_model = AutoModel(
                     model=settings.SPEAKER_MODEL_PATH,
                     disable_update=True,
-                    device=settings.ASR_DEVICE,
+                    device=settings.DEVICE,
                 )
 
             if self.asr_model:
