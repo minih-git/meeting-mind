@@ -178,27 +178,35 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # Record file to session
             session_manager.set_audio_file(session_id, wav_filename)
-            session_manager.update_meeting_settings(session_id, handshake.use_cloud_asr)
 
-            # Register callback or setup Cloud ASR
-            if handshake.use_cloud_asr:
+            # 根据配置决定是否允许使用云端 ASR
+            from meeting_mind.app.core.config import settings
+
+            allow_cloud = settings.ENABLE_CLOUD_ASR and handshake.use_cloud_asr
+
+            session_manager.update_meeting_settings(session_id, allow_cloud)
+
+            if allow_cloud:
+                # 使用云端 ASR
                 use_cloud = True
                 cloud_handler = CloudASRHandler(cloud_callback)
                 connected = await cloud_handler.connect()
                 if not connected:
                     logger.error(
-                        "Failed to connect to Cloud ASR, falling back to local?"
+                        "Failed to connect to Cloud ASR, falling back to local"
                     )
-                    # For now, just error out or close
-                    await websocket.close(
-                        code=1011, reason="Cloud ASR connection failed"
-                    )
-                    return
-                logger.info(f"Session {session_id} using Cloud ASR")
+                    # 回退到本地 ASR
+                    use_cloud = False
+                    asr_engine.register_callback(session_id, send_results)
+                    asr_engine.start_worker()
+                    logger.info(f"Session {session_id} using Local ASR (fallback)")
+                else:
+                    logger.info(f"Session {session_id} using Cloud ASR")
             else:
+                # 使用本地 ASR
                 asr_engine.register_callback(session_id, send_results)
-                # Ensure worker is running
                 asr_engine.start_worker()
+                logger.info(f"Session {session_id} using Local ASR")
 
         except Exception as e:
             logger.error(f"Handshake failed: {e}")

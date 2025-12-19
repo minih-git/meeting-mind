@@ -25,6 +25,9 @@ class Settings:
     # "cuda" or "cpu"
     ASR_DEVICE = "cpu"
 
+    # 是否启用云端 ASR（设为 False 时强制使用本地模型）
+    ENABLE_CLOUD_ASR = False
+
     # LLM Settings
     # "local" or "cloud"
     LLM_PROVIDER = "local"
