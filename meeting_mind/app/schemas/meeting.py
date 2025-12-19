@@ -18,6 +18,7 @@ class AIAnalysis(BaseModel):
 class MeetingCreate(BaseModel):
     title: str
     participants: Optional[List[str]] = []
+    is_confidential: bool = False  # 涉密模式：True=使用本地模型，False=使用云端模型
 
 
 class MeetingResponse(BaseModel):
@@ -29,7 +30,7 @@ class MeetingResponse(BaseModel):
     audio_file: Optional[str] = None
     transcripts: Optional[List[TranscriptItem]] = []
     ai_analysis: Optional[AIAnalysis] = None
-    use_cloud_model: bool = False
+    is_confidential: bool = False  # 涉密模式标识
 
 
 class TranscriptResponse(BaseModel):

@@ -188,12 +188,54 @@ const HistoryPage = () => {
                   marginLeft: "10px",
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
+                  gap: "12px",
                 }}
               >
                 <h2 style={{ margin: 0 }} title={selectedMeeting.title}>
                   {selectedMeeting.title}
                 </h2>
+                {/* 涉密标识 - 与标题同行 */}
+                {selectedMeeting.is_confidential ? (
+                  <span 
+                    className="confidential-badge"
+                    title="涉密会议（本地处理）" 
+                    style={{ 
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 14px",
+                      background: "linear-gradient(135deg, #ff4757, #ff6b81)",
+                      borderRadius: "20px",
+                      fontSize: "0.8rem",
+                      fontWeight: "600",
+                      color: "#fff",
+                      boxShadow: "0 2px 12px rgba(255, 71, 87, 0.4)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    🛡️ 涉密会议
+                  </span>
+                ) : (
+                  <span 
+                    className="cloud-badge"
+                    title="常规会议（云端处理）" 
+                    style={{ 
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 14px",
+                      background: "linear-gradient(135deg, #3b82f6, #60a5fa)",
+                      borderRadius: "20px",
+                      fontSize: "0.8rem",
+                      fontWeight: "600",
+                      color: "#fff",
+                      boxShadow: "0 2px 12px rgba(59, 130, 246, 0.4)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ☁️ 常规会议
+                  </span>
+                )}
               </div>
 
               {selectedMeeting.audio_file ? (
@@ -529,11 +571,42 @@ const HistoryPage = () => {
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="history-card"
+                    className={`history-card ${item.is_confidential ? 'confidential-card' : ''}`}
                     onClick={() => navigate(`/history/detail?id=${item.id}`)}
+                    style={item.is_confidential ? {
+                      border: "2px solid rgba(255, 71, 87, 0.6)",
+                      boxShadow: "0 0 15px rgba(255, 71, 87, 0.2)",
+                    } : {}}
                   >
-                    <div className="card-header" title={item.title}>
-                      <h2 className="card-title">{item.title}</h2>
+                    <div className="card-header" title={item.title} style={{ alignItems: "center" }}>
+                      <h2 className="card-title">
+                        {item.is_confidential ? (
+                          <span 
+                            className="confidential-text"
+                            style={{ 
+                              marginRight: "8px",
+                              color: "#ff4757",
+                              fontWeight: "600",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            🛡️涉密
+                          </span>
+                        ) : (
+                          <span 
+                            className="cloud-text"
+                            style={{ 
+                              marginRight: "8px",
+                              color: "#3b82f6",
+                              fontWeight: "600",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            ☁️常规
+                          </span>
+                        )}
+                        {item.title}
+                      </h2>
                       <span
                         className="status-badge"
                         data-status={item.status}

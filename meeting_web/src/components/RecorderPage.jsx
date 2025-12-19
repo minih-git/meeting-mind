@@ -16,7 +16,9 @@ function RecorderPage({ theme, toggleTheme }) {
   const [analyser, setAnalyser] = useState(null);
   const [duration, setDuration] = useState(0);
   const [secureMode, setSecureMode] = useState(true); // 默认涉密模式
-  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [showMeetingTypeModal, setShowMeetingTypeModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); // 'start' | 'upload'
+  const [pendingFile, setPendingFile] = useState(null);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const [showProcessingToast, setShowProcessingToast] = useState(false);
 
@@ -63,7 +65,23 @@ function RecorderPage({ theme, toggleTheme }) {
     setPartialText("");
   };
 
-  const startMeeting = async () => {
+  // 用户选择会议类型后开始会议
+  const handleStartMeeting = (isConfidential) => {
+    setSecureMode(isConfidential);
+    setShowMeetingTypeModal(false);
+    
+    if (pendingAction === 'upload' && pendingFile) {
+      // 处理文件上传
+      setTimeout(() => processFileUpload(pendingFile, isConfidential), 50);
+    } else {
+      // 开始录音
+      setTimeout(() => startMeetingWithMode(isConfidential), 50);
+    }
+    setPendingAction(null);
+    setPendingFile(null);
+  };
+
+  const startMeetingWithMode = async (isConfidential) => {
     try {
       setStatus("connecting");
       setDuration(0);
@@ -77,6 +95,7 @@ function RecorderPage({ theme, toggleTheme }) {
         body: JSON.stringify({
           title: `Meeting ${new Date().toLocaleString()}`,
           participants: ["User"],
+          is_confidential: isConfidential,
         }),
       });
 
@@ -137,7 +156,7 @@ function RecorderPage({ theme, toggleTheme }) {
         }
       );
 
-      wsClient.current.connect(meeting.id, { useCloudAsr: !secureMode });
+      wsClient.current.connect(meeting.id);
     } catch (err) {
       console.error("Start failed:", err);
       setStatus("error");
@@ -145,10 +164,21 @@ function RecorderPage({ theme, toggleTheme }) {
     }
   };
 
-  const handleFileUpload = async (event) => {
+  // 点击上传按钮时，先选择文件
+  const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    
+    // 存储文件并显示类型选择框
+    setPendingFile(file);
+    setPendingAction('upload');
+    setShowMeetingTypeModal(true);
+    
+    // 清空 input 以便可以重新选择同一文件
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
+  const processFileUpload = async (file, isConfidential) => {
     try {
       setStatus("connecting");
       setDuration(0);
@@ -179,6 +209,7 @@ function RecorderPage({ theme, toggleTheme }) {
         body: JSON.stringify({
           title: `File Upload: ${file.name}`,
           participants: ["User"],
+          is_confidential: isConfidential,
         }),
       });
 
@@ -254,7 +285,7 @@ function RecorderPage({ theme, toggleTheme }) {
         }
       );
 
-      wsClient.current.connect(meeting.id, { useCloudAsr: !secureMode });
+      wsClient.current.connect(meeting.id);
     } catch (err) {
       console.error("File upload failed:", err);
       setStatus("error");
@@ -351,20 +382,6 @@ function RecorderPage({ theme, toggleTheme }) {
               >
                 {theme === "light" ? "🌙" : "☀️"}
               </button>
-              <button
-                id="btn-secure-mode"
-                className="btn btn-secondary btn-header-icon"
-                onClick={() => {
-                  if (secureMode) {
-                    setShowWarningModal(true);
-                  }
-                  setSecureMode(!secureMode);
-                }}
-                disabled={status !== "idle"}
-                title={secureMode ? "涉密模式（本地推理）" : "非涉密模式（云端推理）"}
-              >
-                {secureMode ? "🛡️" : "🌐"}
-              </button>
             </div>
           </div>
           {/* Unified Status Bar */}
@@ -428,7 +445,7 @@ function RecorderPage({ theme, toggleTheme }) {
             }}
           >
             {status === "idle" || status === "error" ? (
-              <button id="btn-start-meeting" className="btn btn-primary" onClick={startMeeting}>
+              <button id="btn-start-meeting" className="btn btn-primary" onClick={() => setShowMeetingTypeModal(true)}>
                 开始会议
               </button>
             ) : (
@@ -446,7 +463,7 @@ function RecorderPage({ theme, toggleTheme }) {
               ref={fileInputRef}
               style={{ display: "none" }}
               accept="audio/*"
-              onChange={handleFileUpload}
+              onChange={handleFileChange}
             />
             <button
               className="btn btn-secondary"
@@ -461,15 +478,79 @@ function RecorderPage({ theme, toggleTheme }) {
         </footer>
       </div>
 
-      {/* 涉密模式关闭警告弹窗 */}
-      <Modal
-        isOpen={showWarningModal}
-        onClose={() => setShowWarningModal(false)}
-        title="安全提醒"
-        type="warning"
-      >
-        当前已关闭涉密保护。您的语音数据将传输至云端服务器进行高精度转录。请确保会议内容不涉企业核心机密。
-      </Modal>
+      {/* 会议类型选择弹窗 */}
+      {showMeetingTypeModal && (
+        <div className="modal-overlay" onClick={() => {
+          setShowMeetingTypeModal(false);
+          setPendingAction(null);
+          setPendingFile(null);
+        }}>
+          <div 
+            className="modal-container" 
+            style={{ maxWidth: "500px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header" style={{ marginBottom: "20px" }}>
+              <span className="modal-icon">🎙️</span>
+              <h2 className="modal-title">选择会议类型</h2>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {/* 涉密会议选项 */}
+              <div 
+                className="meeting-type-option"
+                onClick={() => handleStartMeeting(true)}
+                style={{
+                  padding: "16px 20px",
+                  borderRadius: "12px",
+                  border: "2px solid rgba(255, 71, 87, 0.4)",
+                  background: "linear-gradient(135deg, rgba(255, 71, 87, 0.1), rgba(255, 107, 129, 0.05))",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "1.5rem" }}>🛡️</span>
+                  <span style={{ fontSize: "1.1rem", fontWeight: "600", color: "#ff4757" }}>涉密会议</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                  数据完全在本地处理，不上传云端。适合涉及企业机密、个人隐私等敏感内容的会议。
+                </p>
+              </div>
+
+              {/* 常规会议选项 */}
+              <div 
+                className="meeting-type-option"
+                onClick={() => handleStartMeeting(false)}
+                style={{
+                  padding: "16px 20px",
+                  borderRadius: "12px",
+                  border: "2px solid rgba(59, 130, 246, 0.4)",
+                  background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(96, 165, 250, 0.05))",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "1.5rem" }}>☁️</span>
+                  <span style={{ fontSize: "1.1rem", fontWeight: "600", color: "#3b82f6" }}>常规会议</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: "1.5" }}>
+                  使用云端 AI 服务，提供更高精度的语音转写和智能分析。适合日常会议、培训等场景。
+                </p>
+              </div>
+            </div>
+
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setShowMeetingTypeModal(false)}
+              style={{ marginTop: "16px", width: "100%" }}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 新手引导 */}
 
@@ -487,14 +568,8 @@ function RecorderPage({ theme, toggleTheme }) {
           {
             targetSelector: "#btn-start-meeting",
             title: "开始录制会议",
-            content: "点击此按钮开始实时转写，系统将自动记录您的语音内容。",
+            content: "点击此按钮选择会议类型并开始实时转写。",
             position: "top",
-          },
-          {
-            targetSelector: "#btn-secure-mode",
-            title: "涉密模式切换",
-            content: "🛡️ 涉密模式：数据本地处理\n🌐 非涉密：云端高精度转写",
-            position: "bottom",
           },
           {
             targetSelector: "#btn-history",

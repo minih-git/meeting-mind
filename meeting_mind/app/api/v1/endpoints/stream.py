@@ -179,12 +179,10 @@ async def websocket_endpoint(websocket: WebSocket):
             # Record file to session
             session_manager.set_audio_file(session_id, wav_filename)
 
-            # 根据配置决定是否允许使用云端 ASR
+            # ASR 选择只根据服务端配置决定，与会议涉密属性无关
             from meeting_mind.app.core.config import settings
 
-            allow_cloud = settings.ENABLE_CLOUD_ASR and handshake.use_cloud_asr
-
-            session_manager.update_meeting_settings(session_id, allow_cloud)
+            allow_cloud = settings.ENABLE_CLOUD_ASR and not meeting.is_secret
 
             if allow_cloud:
                 # 使用云端 ASR

@@ -61,7 +61,16 @@ class SessionManager:
         except Exception as e:
             logger.error(f"保存会话失败 {meeting_id}: {e}")
 
-    def create_meeting(self, title: str, participants: List[str]) -> MeetingResponse:
+    def create_meeting(
+        self, title: str, participants: List[str], is_confidential: bool = False
+    ) -> MeetingResponse:
+        """创建新会议
+
+        Args:
+            title: 会议标题
+            participants: 参与者列表
+            is_confidential: 涉密模式，True=使用本地模型，False=使用云端模型
+        """
         meeting_id = str(uuid.uuid4())
         now = time.time()
 
@@ -72,8 +81,8 @@ class SessionManager:
             "start_time": now,
             "participants": participants,
             "audio_file": None,
-            "ai_analysis": None,  # 存储 AI 分析结果
-            "use_cloud_model": False,
+            "ai_analysis": None,
+            "is_confidential": is_confidential,
         }
 
         self.meetings[meeting_id] = meeting_info
@@ -110,10 +119,18 @@ class SessionManager:
             self.meetings[meeting_id]["audio_file"] = filename
             self.save_session(meeting_id)
 
-    def update_meeting_settings(self, meeting_id: str, use_cloud_model: bool):
+    def set_confidential(self, meeting_id: str, is_confidential: bool) -> bool:
+        """设置会议涉密状态
+
+        Args:
+            meeting_id: 会议ID
+            is_confidential: 涉密模式，True=使用本地模型，False=使用云端模型
+        """
         if meeting_id in self.meetings:
-            self.meetings[meeting_id]["use_cloud_model"] = use_cloud_model
+            self.meetings[meeting_id]["is_confidential"] = is_confidential
             self.save_session(meeting_id)
+            return True
+        return False
 
     def add_transcript(self, meeting_id: str, text: str, speaker: Optional[str] = None):
         if meeting_id in self.transcripts:
@@ -158,7 +175,7 @@ class SessionManager:
         return []
 
     def get_history_list(self) -> List[dict]:
-        """Get list of meeting summaries sorted by time desc"""
+        """获取会议历史列表，按时间倒序排列"""
         history = []
         for m in self.meetings.values():
             history.append(
@@ -169,6 +186,7 @@ class SessionManager:
                     "status": m["status"],
                     "participants": m["participants"],
                     "audio_file": m.get("audio_file"),
+                    "is_confidential": m.get("is_confidential", False),
                 }
             )
         return sorted(history, key=lambda x: x["start_time"], reverse=True)
@@ -244,7 +262,7 @@ class SessionManager:
                     {"role": "user", "content": full_text},
                 ],
                 stream=False,
-                force_cloud=meeting.use_cloud_model,
+                force_cloud=not meeting.is_confidential,  # 涉密会议使用本地模型
             )
 
             content = response["content"]
@@ -312,7 +330,7 @@ class SessionManager:
                     {"role": "user", "content": full_text},
                 ],
                 stream=False,
-                force_cloud=meeting.use_cloud_model,
+                force_cloud=not meeting.is_confidential,  # 涉密会议使用本地模型
             )
 
             title = response["content"].strip().strip('"').strip("《").strip("》")

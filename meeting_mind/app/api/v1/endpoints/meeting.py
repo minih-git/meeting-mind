@@ -11,7 +11,9 @@ router = APIRouter()
 
 @router.post("/meetings", response_model=MeetingResponse)
 def create_meeting(meeting: MeetingCreate):
-    return session_manager.create_meeting(meeting.title, meeting.participants)
+    return session_manager.create_meeting(
+        meeting.title, meeting.participants, meeting.is_confidential
+    )
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingResponse)
@@ -44,6 +46,14 @@ async def analyze_meeting(meeting_id: str):
     if not result:
         raise HTTPException(status_code=400, detail="无法生成分析 (可能会议内容为空)")
     return result
+
+
+@router.patch("/meetings/{meeting_id}/confidential")
+def set_meeting_confidential(meeting_id: str, is_confidential: bool):
+    """设置会议涉密状态"""
+    if not session_manager.set_confidential(meeting_id, is_confidential):
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return {"status": "success", "is_confidential": is_confidential}
 
 
 @router.post("/meetings/{meeting_id}/retranscribe")
@@ -134,13 +144,15 @@ async def upload_audio(file: UploadFile = File(...)):
     import uuid
     from pathlib import Path
 
-    # 生成唯一文件名
-    file_ext = Path(file.filename).suffix.lower()
-    file_id = str(uuid.uuid4())[:8]
-    safe_filename = f"{file_id}{file_ext}"
+    # 生成唯一文件名：原文件名_随机后缀.扩展名
+    original_path = Path(file.filename)
+    file_stem = original_path.stem  # 原文件名（不含扩展名）
+    file_ext = original_path.suffix.lower()  # 扩展名
+    file_id = str(uuid.uuid4())[:8]  # 8位随机 ID
+    safe_filename = f"{file_stem}_{file_id}{file_ext}"
 
     # 保存到tmp目录
-    tmp_dir = Path("/tmp")
+    tmp_dir = Path("./tmp")
     file_path = tmp_dir / safe_filename
 
     try:
