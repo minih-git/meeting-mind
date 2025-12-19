@@ -1011,3 +1011,525 @@ body {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
+/* History Page Refactored Styles */
+
+/* Header & Badges */
+.history-header {
+  /* Inherits previous styles */
+}
+
+.confidential-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #ff4757, #ff6b81);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(255, 71, 87, 0.4);
+  white-space: nowrap;
+}
+
+.cloud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(59, 130, 246, 0.4);
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 0.85rem;
+}
+
+/* Tabs */
+.tab-nav {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin: 12px 20px;
+  padding: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+}
+
+.tab-btn {
+  padding: 8px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* Tab Content */
+.tab-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-pane {
+  flex: 1;
+  overflow: auto;
+  padding: 15px 20px;
+}
+
+.transcript-area {
+  flex: 1;
+  margin: 15px 20px;
+  overflow: auto;
+}
+
+/* Analysis Section */
+.ai-analysis-section {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.analysis-card h4 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.analysis-text,
+.analysis-text-block {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.analysis-text-block {
+  white-space: pre-wrap;
+}
+
+/* Empty State */
+.empty-state-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 15px;
+  color: var(--text-secondary);
+}
+
+.empty-state-hint {
+  font-size: 0.85rem;
+}
+
+/* Controls */
+.history-controls {
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.controls-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* Progress Bars */
+/* Progress Bars - Enhanced */
+.progress-container {
+  width: 100%;
+  padding: 16px 20px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  margin-top: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.3s ease-out;
+  box-sizing: border-box;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Striped Animation */
+.progress-bar-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.25) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.25) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 20px 20px;
+  animation: progress-stripe 1s linear infinite;
+}
+
+@keyframes progress-stripe {
+  0% {
+    background-position: 20px 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+.progress-bar-fill.analyze {
+  background: linear-gradient(90deg, #ff9a9e 0%, #ff6b81 100%);
+  box-shadow: 0 2px 10px rgba(255, 107, 129, 0.3);
+}
+
+.progress-bar-fill.retranscribe {
+  background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+  box-shadow: 0 2px 10px rgba(79, 172, 254, 0.3);
+}
+
+/* List Badges */
+.confidential-text {
+  margin-right: 8px;
+  color: #ff4757;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.cloud-text {
+  margin-right: 8px;
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+/* =========================================
+   Mobile Optimization (Responsive Design)
+   ========================================= */
+
+@media (max-width: 768px) {
+  /* Container - Maximize space */
+  .glass-container {
+    width: 95%;
+    height: 98vh; /* Use almost full height */
+    margin: 1vh auto;
+    border-radius: 16px;
+  }
+
+  /* History Header - Compact */
+  .history-header {
+    padding: 12px 16px;
+  }
+
+  .history-header h2 {
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+
+  /* Badges - Smaller */
+  .confidential-badge,
+  .cloud-badge {
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    gap: 4px;
+  }
+  
+  /* Tabs - Compact & Full Width */
+  .tab-nav {
+    margin: 8px 12px;
+    width: auto;
+  }
+
+  .tab-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    flex: 1; /* Distribute space evenly */
+  }
+
+  /* Content - Remove margins */
+  .tab-pane, 
+  .transcript-area {
+    padding: 12px 16px;
+    margin: 0; /* Important: Remove margin on mobile */
+  }
+
+  .ai-analysis-section {
+    padding: 16px;
+  }
+
+  .analysis-grid {
+    gap: 16px;
+  }
+  
+  /* Text readability */
+  .analysis-text,
+  .analysis-text-block, 
+  .text-content {
+    font-size: 1rem; /* Slightly larger for readability */
+    line-height: 1.6;
+  }
+
+  /* Controls - Stacked or Grid */
+  .controls {
+    padding: 12px 16px;
+  }
+
+  .controls-group {
+    flex-direction: row; /* Keep buttons explicitly side-by-side */
+    width: 100%;
+  }
+
+  .controls-group .btn {
+    flex: 1; /* Stretch buttons */
+    padding: 12px; /* Touch target */
+  }
+  
+  /* History List Card - Adjust */
+  .history-list {
+    padding: 12px 16px;
+  }
+  
+  .history-grid {
+    gap: 12px;
+  }
+  
+  .history-card {
+    padding: 16px;
+  }
+  
+  .card-title {
+    font-size: 1rem;
+    width: 100%; /* Allow full width */
+  }
+  
+  .card-header {
+    flex-direction: column; /* Stack title and status */
+    align-items: flex-start !important; /* Override inline style */
+    gap: 8px;
+  }
+  
+  .status-badge {
+    align-self: flex-start;
+  }
+}
+
+/* Header Refactor */
+.header-title-container {
+  flex: 1;
+  margin-left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden; /* Prevent title overflow */
+}
+
+.header-audio-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .history-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+
+  .header-title-container {
+    margin-left: 8px;
+    flex: 1 1 auto; /* Allow shrinking/growing */
+    min-width: 0; /* Enable truncation */
+    justify-content: space-between;
+  }
+
+  .header-audio-controls {
+    width: 100%;
+    justify-content: space-between; /* Spread controls */
+    background: rgba(0,0,0,0.03);
+    padding: 8px 12px;
+    border-radius: 12px;
+    margin-top: 4px;
+  }
+  
+  /* Make badges smaller or stack them? */
+  .confidential-badge, .cloud-badge {
+    white-space: nowrap;
+  }
+  
+  /* Optimize download button text on mobile */
+  .download-btn {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+  }
+}
+
+/* History Page Player Bar */
+.header-audio-player {
+  flex: 1;
+  min-width: 300px; /* Ensure it takes some space */
+}
+
+.player-bar {
+  margin-top: 0; /* Override default status-bar margin */
+  height: 48px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-radius: 24px;
+  width: 100%;
+  box-sizing: border-box; /* Fix overflow issues */
+}
+
+.player-control-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+}
+
+.player-control-btn:hover {
+  background: rgba(0,0,0,0.05);
+  transform: scale(1.1);
+}
+
+.player-time {
+  font-family: "SF Mono", "Roboto Mono", monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.download-icon-btn {
+  font-size: 1rem;
+  text-decoration: none;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.download-icon-btn:hover {
+  background: rgba(0,0,0,0.05);
+  transform: translateY(-2px);
+}
+
+/* Visualization in History Header */
+.header-audio-player .visualizer-wrapper {
+  height: 32px; /* Set explicit height for internal visualizer */
+  flex: 1;
+}
+
+/* Mobile Tweaks for History Header */
+@media (max-width: 768px) {
+  .header-audio-player {
+    width: 100%;
+    margin-top: 10px;
+    order: 3; /* Ensure it's below title */
+  }
+  
+  .player-bar {
+    height: 54px; /* Slightly taller for touch */
+  }
+  
+  .history-header {
+    flex-wrap: wrap; 
+  }
+  
+  /* Hide badges if they take too much space or adjust layout */
+  .header-title-container {
+      width: 100%;
+      margin-left: 0;
+      margin-top: 4px;
+      justify-content: space-between;
+  }
+}
+
+/* Mobile Modal Fix */
+@media (max-width: 768px) {
+  .modal-container {
+    width: 85%;
+    max-width: 340px;
+    padding: 20px;
+    border-radius: 24px;
+  }
+  
+  .meeting-type-option {
+    padding: 12px 16px !important; /* Compact options */
+  }
+  
+  .meeting-type-option p {
+    font-size: 0.8rem !important;
+  }
+}

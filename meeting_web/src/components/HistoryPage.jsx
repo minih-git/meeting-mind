@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
+import WaveformVisualizer from "./WaveformVisualizer";
+import Modal from "./Modal";
 
-const HistoryPage = () => {
+const HistoryPage = ({ theme }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const meetingId = searchParams.get("id");
@@ -14,6 +16,7 @@ const HistoryPage = () => {
   const [analyzeProgress, setAnalyzeProgress] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState("analysis"); // 'analysis' | 'transcript'
+  const [notification, setNotification] = useState({ isOpen: false, title: "", message: "", type: "info" });
   const audioRef = useRef(null);
   
   // API前缀，支持环境变量配置
@@ -97,7 +100,12 @@ const HistoryPage = () => {
       setTimeout(() => setAnalyzeProgress(null), 1000);
     } catch (err) {
       console.error("Analysis failed:", err);
-      alert("分析失败，请稍后重试");
+      setNotification({
+        isOpen: true,
+        title: "分析失败",
+        message: "分析失败，请稍后重试",
+        type: "error"
+      });
       setAnalyzeProgress(null);
     } finally {
       setLoading(false);
@@ -144,11 +152,21 @@ const HistoryPage = () => {
             setLoading(false);
             // 刷新页面数据
             fetchDetail(selectedMeeting.id);
-            alert("转写完成！");
+            setNotification({
+              isOpen: true,
+              title: "成功",
+              message: "转写完成！",
+              type: "success"
+            });
           } else if (data.status === "failed") {
             eventSource.close();
             setLoading(false);
-            alert("转写失败: " + (data.error || "未知错误"));
+            setNotification({
+              isOpen: true,
+              title: "转写失败",
+              message: "转写失败: " + (data.error || "未知错误"),
+              type: "error"
+            });
           }
         } catch (e) {
           console.error("SSE parse error:", e);
@@ -162,9 +180,99 @@ const HistoryPage = () => {
       };
     } catch (err) {
       console.error("Retranscription failed:", err);
-      alert("请求失败，请检查网络或后端日志");
+      setNotification({
+        isOpen: true,
+        title: "请求失败",
+        message: "请求失败，请检查网络或后端日志",
+        type: "error"
+      });
       setLoading(false);
       setRetranscribeProgress(null);
+    }
+  };
+
+  // Audio Visualizer State
+  const audioContextRef = useRef(null);
+  const sourceRef = useRef(null);
+  const analyserRef = useRef(null);
+  const [analyser, setAnalyser] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  // Initialize Audio Context for Visualizer
+  useEffect(() => {
+    if (selectedMeeting?.audio_file && audioRef.current) {
+      const audio = audioRef.current;
+      audio.crossOrigin = "anonymous";
+      
+      const initAudioContext = () => {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          analyserRef.current = audioContextRef.current.createAnalyser();
+          analyserRef.current.fftSize = 256;
+          
+          sourceRef.current = audioContextRef.current.createMediaElementSource(audio);
+          sourceRef.current.connect(analyserRef.current);
+          analyserRef.current.connect(audioContextRef.current.destination);
+          
+          setAnalyser(analyserRef.current);
+        } else if (audioContextRef.current.state === 'suspended') {
+          audioContextRef.current.resume();
+        }
+      };
+
+      // Interact to start AudioContext (browser policy)
+      const handlePlayFn = () => {
+        initAudioContext();
+        setIsPlaying(true);
+      };
+      
+      const handlePauseFn = () => setIsPlaying(false);
+      const handleEndedFn = () => setIsPlaying(false);
+      const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+      const handleLoadedMetadata = () => setDuration(audio.duration);
+
+      audio.addEventListener('play', handlePlayFn);
+      audio.addEventListener('pause', handlePauseFn);
+      audio.addEventListener('ended', handleEndedFn);
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+      return () => {
+        audio.removeEventListener('play', handlePlayFn);
+        audio.removeEventListener('pause', handlePauseFn);
+        audio.removeEventListener('ended', handleEndedFn);
+        audio.removeEventListener('timeupdate', handleTimeUpdate);
+        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        // Do not close AudioContext here to avoid re-creation issues on re-renders, 
+        // or manage it carefully. For simple SPA, keeping it is usually fine or close on unmount.
+      };
+    }
+  }, [selectedMeeting]);
+
+  // Pickup cleanup on unmount
+  useEffect(() => {
+    return () => {
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+        }
+    }
+  }, []);
+
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const togglePlay = () => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
     }
   };
 
@@ -182,36 +290,15 @@ const HistoryPage = () => {
               >
                 ←
               </button>
-              <div
-                style={{
-                  flex: 1,
-                  marginLeft: "10px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                }}
-              >
+              <div className="header-title-container">
                 <h2 style={{ margin: 0 }} title={selectedMeeting.title}>
                   {selectedMeeting.title}
                 </h2>
-                {/* 涉密标识 - 与标题同行 */}
+                {/* 涉密标识 */}
                 {selectedMeeting.is_confidential ? (
                   <span 
                     className="confidential-badge"
                     title="涉密会议（本地处理）" 
-                    style={{ 
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "6px 14px",
-                      background: "linear-gradient(135deg, #ff4757, #ff6b81)",
-                      borderRadius: "20px",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      color: "#fff",
-                      boxShadow: "0 2px 12px rgba(255, 71, 87, 0.4)",
-                      whiteSpace: "nowrap",
-                    }}
                   >
                     🛡️ 涉密会议
                   </span>
@@ -219,178 +306,100 @@ const HistoryPage = () => {
                   <span 
                     className="cloud-badge"
                     title="常规会议（云端处理）" 
-                    style={{ 
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "6px 14px",
-                      background: "linear-gradient(135deg, #3b82f6, #60a5fa)",
-                      borderRadius: "20px",
-                      fontSize: "0.8rem",
-                      fontWeight: "600",
-                      color: "#fff",
-                      boxShadow: "0 2px 12px rgba(59, 130, 246, 0.4)",
-                      whiteSpace: "nowrap",
-                    }}
                   >
                     ☁️ 常规会议
                   </span>
                 )}
               </div>
 
-              {selectedMeeting.audio_file ? (
-                <div
-                  style={{ display: "flex", gap: "10px", alignItems: "center" }}
-                >
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: "5px 12px", fontSize: "0.85rem" }}
-                    onClick={() => {
-                      if (audioRef.current) {
-                        if (isPlaying) {
-                          audioRef.current.pause();
-                        } else {
-                          audioRef.current.play();
-                        }
-                        setIsPlaying(!isPlaying);
-                      }
-                    }}
-                  >
-                    {isPlaying ? "⏸️ 暂停" : "▶️ 播放"}
-                  </button>
-                  <a
-                    href={`${apiPrefix}/audio/${selectedMeeting.id}`}
-                    download
-                    className="download-btn"
-                  >
-                    下载录音
-                  </a>
+               {/* New Audio Player UI - Stacked on Mobile via CSS */}
+               {selectedMeeting.audio_file && (
+                <div className="header-audio-player">
+                  <div className="status-bar-container player-bar">
+                    <button
+                      className="player-control-btn"
+                      onClick={togglePlay}
+                    >
+                       {isPlaying ? "⏸️" : "▶️"}
+                    </button>
+                    
+                    <div className="visualizer-wrapper">
+                      <WaveformVisualizer analyser={analyser} theme={theme} />
+                    </div>
+
+                    <div className="player-time">
+                      {formatTime(currentTime)} / {formatTime(duration)}
+                    </div>
+                    
+                     <a
+                      href={`${apiPrefix}/audio/${selectedMeeting.id}`}
+                      download
+                      className="download-icon-btn"
+                      title="下载录音"
+                    >
+                      ⬇️
+                    </a>
+                  </div>
+
                   <audio
                     ref={audioRef}
                     src={`${apiPrefix}/audio/${selectedMeeting.id}`}
-                    onEnded={() => setIsPlaying(false)}
+                    crossOrigin="anonymous"
                     style={{ display: "none" }}
                   />
                 </div>
-              ) : (
-                <div style={{ width: "36px" }}></div>
               )}
             </div>
 
             {/* Tab 导航 */}
-            <div className="tab-nav" style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "4px",
-              margin: "12px 20px",
-              padding: "4px",
-              background: "var(--bg-tertiary)",
-              borderRadius: "12px",
-            }}>
+            <div className="tab-nav">
               <button
                 className={`tab-btn ${activeTab === "analysis" ? "active" : ""}`}
                 onClick={() => setActiveTab("analysis")}
-                style={{
-                  padding: "8px 20px",
-                  background: activeTab === "analysis" ? "var(--accent-primary)" : "transparent",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: activeTab === "analysis" ? "#fff" : "var(--text-secondary)",
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
               >
                 ✨ AI 会议分析
               </button>
               <button
                 className={`tab-btn ${activeTab === "transcript" ? "active" : ""}`}
                 onClick={() => setActiveTab("transcript")}
-                style={{
-                  padding: "8px 20px",
-                  background: activeTab === "transcript" ? "var(--accent-primary)" : "transparent",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: activeTab === "transcript" ? "#fff" : "var(--text-secondary)",
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
               >
                 💬 对话记录
               </button>
             </div>
 
             {/* Tab 内容区域 */}
-            <div className="tab-content" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <div className="tab-content">
               {/* AI 会议分析 Tab */}
               {activeTab === "analysis" && (
-                <div style={{ flex: 1, overflow: "auto", padding: "15px 20px" }}>
+                <div className="tab-pane">
                   {selectedMeeting.ai_analysis ? (
-                    <div
-                      className="ai-analysis-section"
-                      style={{
-                        background: "rgba(255, 255, 255, 0.1)",
-                        padding: "20px",
-                        borderRadius: "10px",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                      }}
-                    >
-                      <div
-                        className="analysis-grid"
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr",
-                          gap: "20px",
-                        }}
-                      >
+                    <div className="ai-analysis-section">
+                      <div className="analysis-grid">
                         <div className="analysis-card">
                           <h4>📝 会议总结</h4>
-                          <p style={{ fontSize: "0.9rem", lineHeight: "1.6" }}>
+                          <p className="analysis-text">
                             {selectedMeeting.ai_analysis.summary}
                           </p>
                         </div>
                         <div className="analysis-card">
                           <h4>💡 关键要点</h4>
-                          <div
-                            style={{
-                              fontSize: "0.9rem",
-                              lineHeight: "1.6",
-                              whiteSpace: "pre-wrap",
-                            }}
-                          >
+                          <div className="analysis-text-block">
                             {selectedMeeting.ai_analysis.key_points}
                           </div>
                         </div>
                         <div className="analysis-card">
                           <h4>✅ 行动项</h4>
-                          <div
-                            style={{
-                              fontSize: "0.9rem",
-                              lineHeight: "1.6",
-                              whiteSpace: "pre-wrap",
-                            }}
-                          >
+                          <div className="analysis-text-block">
                             {selectedMeeting.ai_analysis.action_items}
                           </div>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="empty-state" style={{ 
-                      display: "flex", 
-                      flexDirection: "column", 
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: "100%",
-                      gap: "15px",
-                      color: "var(--text-secondary)"
-                    }}>
+                    <div className="empty-state-content">
                       <span style={{ fontSize: "3rem" }}>✨</span>
                       <p>暂无分析结果</p>
-                      <p style={{ fontSize: "0.85rem" }}>点击下方"AI 智能分析"按钮生成会议分析</p>
+                      <p className="empty-state-hint">点击下方"AI 智能分析"按钮生成会议分析</p>
                     </div>
                   )}
                 </div>
@@ -398,14 +407,7 @@ const HistoryPage = () => {
 
               {/* 对话记录 Tab */}
               {activeTab === "transcript" && (
-                <div
-                  className="transcript-area"
-                  style={{
-                    flex: 1,
-                    margin: "15px 20px",
-                    overflow: "auto",
-                  }}
-                >
+                <div className="transcript-area">
                   {selectedMeeting.transcripts &&
                     selectedMeeting.transcripts.map((item, index) => (
                       <div key={index} className="transcript-item">
@@ -426,17 +428,8 @@ const HistoryPage = () => {
               )}
             </div>
 
-            <div
-              className="controls"
-              style={{ flexShrink: 0, flexDirection: "column", gap: "10px" }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  justifyContent: "center",
-                }}
-              >
+            <div className="controls history-controls">
+              <div className="controls-group">
                 <button
                   className="btn btn-primary"
                   onClick={analyzeMeeting}
@@ -457,82 +450,30 @@ const HistoryPage = () => {
               </div>
 
               {analyzeProgress && (
-                <div
-                  style={{
-                    width: "100%",
-                    padding: "10px 20px",
-                    background: "rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "5px",
-                      fontSize: "0.9rem",
-                    }}
-                  >
+                <div className="progress-container">
+                  <div className="progress-label">
                     <span>{analyzeProgress.message}</span>
                     <span>{analyzeProgress.progress}%</span>
                   </div>
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "8px",
-                      background: "rgba(255,255,255,0.2)",
-                      borderRadius: "4px",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div className="progress-bar">
                     <div
-                      style={{
-                        width: `${analyzeProgress.progress}%`,
-                        height: "100%",
-                        background: "linear-gradient(90deg, #ff9a9e, #fecfef)",
-                        transition: "width 0.3s ease",
-                      }}
+                      className="progress-bar-fill analyze"
+                      style={{ width: `${analyzeProgress.progress}%` }}
                     />
                   </div>
                 </div>
               )}
 
               {retranscribeProgress && (
-                <div
-                  style={{
-                    width: "100%",
-                    padding: "10px 20px",
-                    background: "rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "5px",
-                      fontSize: "0.9rem",
-                    }}
-                  >
+                <div className="progress-container">
+                  <div className="progress-label">
                     <span>{retranscribeProgress.message}</span>
                     <span>{retranscribeProgress.progress}%</span>
                   </div>
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "8px",
-                      background: "rgba(255,255,255,0.2)",
-                      borderRadius: "4px",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div className="progress-bar">
                     <div
-                      style={{
-                        width: `${retranscribeProgress.progress}%`,
-                        height: "100%",
-                        background: "linear-gradient(90deg, #4facfe, #00f2fe)",
-                        transition: "width 0.3s ease",
-                      }}
+                      className="progress-bar-fill retranscribe"
+                      style={{ width: `${retranscribeProgress.progress}%` }}
                     />
                   </div>
                 </div>
@@ -540,6 +481,15 @@ const HistoryPage = () => {
             </div>
           </div>
         </div>
+
+        <Modal
+          isOpen={notification.isOpen}
+          onClose={() => setNotification({ ...notification, isOpen: false })}
+          title={notification.title}
+          type={notification.type}
+        >
+          {notification.message}
+        </Modal>
       </div>
     );
   }
@@ -572,7 +522,18 @@ const HistoryPage = () => {
                   <div
                     key={item.id}
                     className={`history-card ${item.is_confidential ? 'confidential-card' : ''}`}
-                    onClick={() => navigate(`/history/detail?id=${item.id}`)}
+                    onClick={() => {
+                      if (item.status === "active" || item.status === "processing") {
+                        setNotification({
+                          isOpen: true,
+                          title: "无法查看详情",
+                          message: "该会议正在录音或处理中，暂时无法查看详情",
+                          type: "warning"
+                        });
+                        return;
+                      }
+                      navigate(`/history/detail?id=${item.id}`);
+                    }}
                     style={item.is_confidential ? {
                       border: "2px solid rgba(255, 71, 87, 0.6)",
                       boxShadow: "0 0 15px rgba(255, 71, 87, 0.2)",
@@ -581,27 +542,11 @@ const HistoryPage = () => {
                     <div className="card-header" title={item.title} style={{ alignItems: "center" }}>
                       <h2 className="card-title">
                         {item.is_confidential ? (
-                          <span 
-                            className="confidential-text"
-                            style={{ 
-                              marginRight: "8px",
-                              color: "#ff4757",
-                              fontWeight: "600",
-                              fontSize: "0.85rem",
-                            }}
-                          >
+                          <span className="confidential-text">
                             🛡️涉密
                           </span>
                         ) : (
-                          <span 
-                            className="cloud-text"
-                            style={{ 
-                              marginRight: "8px",
-                              color: "#3b82f6",
-                              fontWeight: "600",
-                              fontSize: "0.85rem",
-                            }}
-                          >
+                          <span className="cloud-text">
                             ☁️常规
                           </span>
                         )}
@@ -633,6 +578,15 @@ const HistoryPage = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification({ ...notification, isOpen: false })}
+        title={notification.title}
+        type={notification.type}
+      >
+        {notification.message}
+      </Modal>
     </div>
   );
 };

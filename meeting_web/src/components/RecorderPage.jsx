@@ -21,6 +21,7 @@ function RecorderPage({ theme, toggleTheme }) {
   const [pendingFile, setPendingFile] = useState(null);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const [showProcessingToast, setShowProcessingToast] = useState(false);
+  const [notification, setNotification] = useState({ isOpen: false, title: "", message: "", type: "info" });
 
   const audioProcessor = useRef(null);
   const wsClient = useRef(null);
@@ -160,7 +161,12 @@ function RecorderPage({ theme, toggleTheme }) {
     } catch (err) {
       console.error("Start failed:", err);
       setStatus("error");
-      alert("Failed to start meeting: " + err.message);
+      setNotification({
+        isOpen: true,
+        title: "启动失败",
+        message: "Failed to start meeting: " + err.message,
+        type: "error"
+      });
     }
   };
 
@@ -289,7 +295,12 @@ function RecorderPage({ theme, toggleTheme }) {
     } catch (err) {
       console.error("File upload failed:", err);
       setStatus("error");
-      alert("Failed to upload/process file: " + err.message);
+      setNotification({
+        isOpen: true,
+        title: "上传失败",
+        message: "Failed to upload/process file: " + err.message,
+        type: "error"
+      });
     } finally {
       // Reset input
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -308,7 +319,12 @@ function RecorderPage({ theme, toggleTheme }) {
       setAnalyser(audioProcessor.current.getAnalyser());
     } catch (err) {
       console.error("Audio failed:", err);
-      alert("Microphone access denied");
+      setNotification({
+        isOpen: true,
+        title: "权限错误",
+        message: "Microphone access denied",
+        type: "error"
+      });
       stopMeeting();
     }
   };
@@ -371,8 +387,18 @@ function RecorderPage({ theme, toggleTheme }) {
               <button
                 id="btn-history"
                 className="btn btn-secondary btn-header-text"
-                onClick={() => navigate("/history")}
-                disabled={status !== "idle"}
+                onClick={() => {
+                  if (status === "active" || status === "stopping" || status === "connecting") {
+                    setNotification({
+                      isOpen: true,
+                      title: "无法跳转",
+                      message: "当前正在录音或处理中，请稍后再试",
+                      type: "warning"
+                    });
+                    return;
+                  }
+                  navigate("/history");
+                }}
               >
                 历史记录
               </button>
@@ -551,6 +577,16 @@ function RecorderPage({ theme, toggleTheme }) {
           </div>
         </div>
       )}
+
+      {/* Notification Modal */}
+      <Modal
+        isOpen={notification.isOpen}
+        onClose={() => setNotification({ ...notification, isOpen: false })}
+        title={notification.title}
+        type={notification.type}
+      >
+        {notification.message}
+      </Modal>
 
       {/* 新手引导 */}
 

@@ -24,8 +24,8 @@ function App() {
           path="/home"
           element={<RecorderPage theme={theme} toggleTheme={toggleTheme} />}
         />
-        <Route path="/history" element={<HistoryPage />} />
-        <Route path="/history/detail" element={<HistoryPage />} />
+        <Route path="/history" element={<HistoryPage theme={theme} />} />
+        <Route path="/history/detail" element={<HistoryPage theme={theme} />} />
       </Routes>
     </HashRouter>
   );

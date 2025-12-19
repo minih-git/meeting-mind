@@ -42,10 +42,23 @@ async def analyze_meeting(meeting_id: str):
     """
     触发会议 AI 分析 (总结、要点、行动项)
     """
-    result = await session_manager.generate_analysis(meeting_id)
-    if not result:
-        raise HTTPException(status_code=400, detail="无法生成分析 (可能会议内容为空)")
-    return result
+    try:
+        result = await session_manager.generate_analysis(meeting_id)
+        if not result:
+            # Check if transcripts exist to give better error
+            transcripts = session_manager.get_transcript(meeting_id)
+            if not transcripts:
+                raise HTTPException(
+                    status_code=400, detail="Meeting has no transcripts to analyze."
+                )
+            raise HTTPException(
+                status_code=400, detail="Analysis generation failed (empty result)."
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @router.patch("/meetings/{meeting_id}/confidential")
