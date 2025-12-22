@@ -14,6 +14,7 @@ import datetime
 from meeting_mind.app.services.session_mgr import session_manager
 from meeting_mind.app.services.cloud_asr import CloudASRHandler
 from meeting_mind.app.core.logger import logger
+from meeting_mind.app.core.lock_manager import global_lock
 
 router = APIRouter()
 
@@ -140,6 +141,18 @@ async def websocket_endpoint(websocket: WebSocket):
         await send_results([result], is_final=False)
 
     try:
+        # Try to acquire global lock immediately upon connection
+        # Use a temporary session ID for lock acquisition attempt (or just check status)
+        # We don't have the real session ID yet (it comes in handshake), but we need to block early.
+        # Actually, we can wait for handshake to get ID, or generate a temp one.
+        # But to match requirements "不允许发起第二个录音", we should check before any heavy lifting.
+
+        # However, we need a unique ID to be the owner.
+        # Since we haven't received handshake, we can't use meeting_id yet.
+        # But if we wait for handshake, we establish connection first.
+        # Let's wait for handshake first, then acquire lock using meeting_id.
+        pass
+
         # 1. Handshake
         data = await websocket.receive_text()
         try:
@@ -153,6 +166,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.warning(f"Invalid meeting ID: {session_id}")
                 await websocket.close(code=1008, reason="Invalid meeting ID")
                 return
+
+            # Note: Global lock is now acquired in create_meeting (HTTP POST).
+            # We just verify here if needed, or assume it's held.
+            # Technically, if this session_id doesn't hold the lock, it might be a logic error
+            # (or the lock was released due to timeout if we implement that).
+            # For now, we rely on the flow: Create -> Connect.
 
             if meeting.status != "active":
                 logger.warning(f"Meeting {session_id} not active")
@@ -327,6 +346,11 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.close()
     finally:
         connection_closed = True
+
+        # Release global lock if held by this session
+        if session_id:
+            global_lock.release(session_id)
+
         if "wav_file" in locals() and wav_file:
             wav_file.close()
             logger.info(f"Recording saved: {wav_path}")

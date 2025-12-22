@@ -138,6 +138,23 @@ class SessionManager:
             self.transcripts[meeting_id].append(item)
             self.save_session(meeting_id)
 
+    def delete_session(self, meeting_id: str):
+        """删除会话（内存和磁盘）"""
+        # 1. Remove from memory
+        if meeting_id in self.meetings:
+            del self.meetings[meeting_id]
+        if meeting_id in self.transcripts:
+            del self.transcripts[meeting_id]
+
+        # 2. Remove from disk
+        filepath = os.path.join(self.data_dir, f"{meeting_id}.json")
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                logger.info(f"Deleted session file: {filepath}")
+            except Exception as e:
+                logger.error(f"Failed to delete session file {filepath}: {e}")
+
     def get_transcript(self, meeting_id: str) -> List[TranscriptItem]:
         # 1. Memory cache hit
         if meeting_id in self.transcripts:

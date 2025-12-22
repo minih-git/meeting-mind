@@ -9,11 +9,33 @@ from meeting_mind.app.services.session_mgr import session_manager
 router = APIRouter()
 
 
+from meeting_mind.app.core.lock_manager import global_lock
+
+
 @router.post("/meetings", response_model=MeetingResponse)
 def create_meeting(meeting: MeetingCreate):
-    return session_manager.create_meeting(
+    # 1. Create meeting entry first (to get ID)
+    new_meeting = session_manager.create_meeting(
         meeting.title, meeting.participants, meeting.is_confidential
     )
+
+    # 2. Try to acquire global lock
+    if not global_lock.try_acquire(new_meeting.id):
+        # 如果获取锁失败，删除刚刚创建的会议记录，防止生成空的历史记录
+        session_manager.delete_session(new_meeting.id)
+
+        # Return specific error message
+        # NOTE: Frontend expects JSON error. HTTPException detail is usually string.
+        # But we can pass dict which FastAPI converts to JSON in 'detail'.
+        # However, user format requirement is specific.
+        # The user said: 提示用户“...”
+        # We'll use a standard HTTPException but with the text the user asked for.
+        # Front end probably just displays `detail`.
+
+        msg = "语音助手正在忙碌中（当前占用率较高），大约需要等待30秒，请稍后重试或选择文字交流。"
+        raise HTTPException(status_code=503, detail=msg)
+
+    return new_meeting
 
 
 @router.get("/meetings/{meeting_id}", response_model=MeetingResponse)

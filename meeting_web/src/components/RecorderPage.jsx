@@ -100,7 +100,21 @@ function RecorderPage({ theme, toggleTheme }) {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to create meeting");
+      if (!response.ok) {
+        if (response.status === 503) {
+          const errorData = await response.json();
+          // 显示后端返回的友好提示
+          setNotification({
+            isOpen: true,
+            title: "系统忙碌",
+            message: errorData.detail || "服务当前繁忙，请稍后重试",
+            type: "warning"
+          });
+          setStatus("idle"); // Reset status immediately
+          return; // Stop execution
+        }
+        throw new Error("Failed to create meeting");
+      }
       const meeting = await response.json();
       setMeetingId(meeting.id);
       console.log("Meeting created:", meeting.id);
@@ -219,7 +233,21 @@ function RecorderPage({ theme, toggleTheme }) {
         }),
       });
 
-      if (!response.ok) throw new Error("Failed to create meeting");
+      if (!response.ok) {
+        if (response.status === 503) {
+          const errorData = await response.json();
+          setNotification({
+            isOpen: true,
+            title: "系统忙碌",
+            message: errorData.detail || "服务当前繁忙，请稍后重试",
+            type: "warning"
+          });
+          stopAudio(); // 停止音频播放 (因为 setupPlayback 在请求前启动了播放)
+          setStatus("idle");
+          return;
+        }
+        throw new Error("Failed to create meeting");
+      }
       const meeting = await response.json();
       setMeetingId(meeting.id);
 
