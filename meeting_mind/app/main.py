@@ -43,6 +43,27 @@ def read_root():
 
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
+    import os
 
-    uvicron.run("meeting_mind.app.main:app", host="0.0.0.0", port=9528, reload=True)
+    parser = argparse.ArgumentParser(description="MeetingMind API Server")
+    parser.add_argument(
+        "--enable-global-lock",
+        action="store_true",
+        help="Enable global recording lock (single concurrent session)",
+    )
+    # 也可以透传其他 uvicorn 参数，这里简单处理
+    parser.add_argument("--host", default="0.0.0.0", help="Bind host")
+    parser.add_argument("--port", type=int, default=9528, help="Bind port")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
+
+    args = parser.parse_args()
+
+    if args.enable_global_lock:
+        os.environ["ENABLE_GLOBAL_LOCK"] = "true"
+        print("Global recording lock ENABLED")
+
+    uvicorn.run(
+        "meeting_mind.app.main:app", host=args.host, port=args.port, reload=args.reload
+    )

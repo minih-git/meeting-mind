@@ -26,6 +26,9 @@ class Settings:
     # 是否启用云端 ASR（设为 False 时强制使用本地模型）
     ENABLE_CLOUD_ASR = False
 
+    # 是否启用全局录音锁（防止多用户并发录音）
+    ENABLE_GLOBAL_LOCK = os.getenv("ENABLE_GLOBAL_LOCK", "False").lower() == "true"
+
     # 调用远程模型设置 (从环境变量读取，避免泄露)
     CLOUD_LLM_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
 

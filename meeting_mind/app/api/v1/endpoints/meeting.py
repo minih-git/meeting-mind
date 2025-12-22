@@ -19,8 +19,10 @@ def create_meeting(meeting: MeetingCreate):
         meeting.title, meeting.participants, meeting.is_confidential
     )
 
-    # 2. Try to acquire global lock
-    if not global_lock.try_acquire(new_meeting.id):
+    # 2. Try to acquire global lock (if enabled)
+    from meeting_mind.app.core.config import settings
+
+    if settings.ENABLE_GLOBAL_LOCK and not global_lock.try_acquire(new_meeting.id):
         # 如果获取锁失败，删除刚刚创建的会议记录，防止生成空的历史记录
         session_manager.delete_session(new_meeting.id)
 
